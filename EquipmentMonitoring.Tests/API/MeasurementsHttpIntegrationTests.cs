@@ -67,6 +67,30 @@ namespace EquipmentMonitoring.Tests.API
         }
 
         [Fact]
+        public async Task PostMeasurement_WithSpaceInsteadOfTInMeasuredAt_ShouldReturn400()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+
+            var equipmentId = await CreateEquipmentAsync(client, "SN-HTTP-002B");
+
+            const string body = """
+                                {
+                                  "type": "Voltage",
+                                  "value": 220,
+                                  "unit": "V",
+                                  "measuredAt": "2026-10-24 10:30:00Z"
+                                }
+                                """;
+
+            var response = await client.PostAsync(
+                $"/api/equipment/{equipmentId}/measurements",
+                new StringContent(body, Encoding.UTF8, "application/json"));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
         public async Task PostMeasurement_WithNonNumericJsonValue_ShouldReturn400()
         {
             await using var factory = new CustomApiFactory();
@@ -112,6 +136,57 @@ namespace EquipmentMonitoring.Tests.API
             Assert.Equal(2, json.RootElement.GetArrayLength());
             Assert.Equal("Voltage", json.RootElement[0].GetProperty("type").GetString());
             Assert.Equal("Voltage", json.RootElement[1].GetProperty("type").GetString());
+        }
+
+        [Fact]
+        public async Task GetHistory_WithEmptyTypeQuery_ShouldReturn400()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+
+            var equipmentId = await CreateEquipmentAsync(client, "SN-HTTP-004B");
+
+            var response = await client.GetAsync(
+                $"/api/equipment/{equipmentId}/measurements?type=");
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetHistory_WithSpaceInsteadOfTInFrom_ShouldReturn400()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+
+            var equipmentId = await CreateEquipmentAsync(client, "SN-HTTP-004C");
+
+            var response = await client.GetAsync(
+                $"/api/equipment/{equipmentId}/measurements?from=2026-10-24%2011:00:00Z");
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetHistory_WithEncodedPlusOffset_ShouldApplyFilter()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+
+            var equipmentId = await CreateEquipmentAsync(client, "SN-HTTP-004D");
+
+            await PostMeasurementAsync(client, equipmentId, "Voltage", 210, "V", "2026-10-24T11:00:00Z");
+            await PostMeasurementAsync(client, equipmentId, "Voltage", 220, "V", "2026-10-24T12:00:00Z");
+
+            var response = await client.GetAsync(
+                $"/api/equipment/{equipmentId}/measurements?from=2026-10-24T13:00:00%2B02:00");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var json = JsonDocument.Parse(content);
+            Assert.Equal(2, json.RootElement.GetArrayLength());
+            Assert.Equal(220, json.RootElement[0].GetProperty("value").GetDouble());
+            Assert.Equal(210, json.RootElement[1].GetProperty("value").GetDouble());
         }
 
         [Fact]

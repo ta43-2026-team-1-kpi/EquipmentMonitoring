@@ -1,16 +1,11 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
+using EquipmentMonitoring.Application.Validation;
 
 namespace EquipmentMonitoring.Application.Serialization
 {
     public sealed class StrictNullableDateTimeOffsetJsonConverter : JsonConverter<DateTimeOffset?>
     {
-        private static readonly Regex OffsetPattern = new(
-            "(Z|[+-]\\d{2}:\\d{2})$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
         public override DateTimeOffset? Read(
             ref Utf8JsonReader reader,
             Type typeToConvert,
@@ -33,16 +28,7 @@ namespace EquipmentMonitoring.Application.Serialization
                 throw new JsonException("Поле MeasuredAt не може бути порожнім.");
             }
 
-            if (!OffsetPattern.IsMatch(text))
-            {
-                throw new JsonException("Поле MeasuredAt має містити часовий зсув або суфікс Z.");
-            }
-
-            if (!DateTimeOffset.TryParse(
-                    text,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out var parsed))
+            if (!StrictDateTimeOffsetParser.TryParse(text, out var parsed))
             {
                 throw new JsonException("Поле MeasuredAt має бути у валідному форматі ISO 8601.");
             }
@@ -61,7 +47,7 @@ namespace EquipmentMonitoring.Application.Serialization
                 return;
             }
 
-            writer.WriteStringValue(value.Value.ToString("O", CultureInfo.InvariantCulture));
+            writer.WriteStringValue(value.Value.ToString("O"));
         }
     }
 }

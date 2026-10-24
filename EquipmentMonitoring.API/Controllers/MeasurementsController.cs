@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Measurement;
 using EquipmentMonitoring.Application.Exceptions;
@@ -14,10 +12,6 @@ namespace EquipmentMonitoring.API.Controllers
     [Route("api/equipment/{equipmentId:guid}/measurements")]
     public class MeasurementsController : ControllerBase
     {
-        private static readonly Regex OffsetPattern = new(
-            "(Z|[+-]\\d{2}:\\d{2})$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
         private readonly IEquipmentRepository _equipmentRepository;
         private readonly IMeasurementRepository _measurementRepository;
         private readonly MeasurementRegistrationValidator _measurementRegistrationValidator;
@@ -176,14 +170,17 @@ namespace EquipmentMonitoring.API.Controllers
         {
             parsedType = null;
 
+            if (Request.Query.ContainsKey("type"))
+            {
+                if (string.IsNullOrWhiteSpace(type))
+                {
+                    return false;
+                }
+            }
+
             if (type is null)
             {
                 return true;
-            }
-
-            if (Request.Query.ContainsKey("type") && string.IsNullOrWhiteSpace(type))
-            {
-                return false;
             }
 
             foreach (var allowedType in Enum.GetValues<MeasurementType>())
@@ -220,17 +217,7 @@ namespace EquipmentMonitoring.API.Controllers
                 return false;
             }
 
-            if (!OffsetPattern.IsMatch(value))
-            {
-                error = "Дата й час мають містити часовий зсув або суфікс Z.";
-                return false;
-            }
-
-            if (!DateTimeOffset.TryParse(
-                    value,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out var parsed))
+            if (!StrictDateTimeOffsetParser.TryParse(value, out var parsed))
             {
                 error = "Вкажіть дату й час у форматі ISO 8601.";
                 return false;
