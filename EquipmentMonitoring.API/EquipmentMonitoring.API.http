@@ -48,7 +48,7 @@ Accept: application/json
 
 ###
 
-### Повторний серійний номер (очікується 400)
+### Повторний серійний номер (очікується 400 через попередню перевірку)
 POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment
 Content-Type: application/json
 Accept: application/json
