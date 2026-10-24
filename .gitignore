@@ -18,3 +18,7 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# SQLite database files
+**/equipment-monitoring.db
+**/equipment-monitoring.db-*
