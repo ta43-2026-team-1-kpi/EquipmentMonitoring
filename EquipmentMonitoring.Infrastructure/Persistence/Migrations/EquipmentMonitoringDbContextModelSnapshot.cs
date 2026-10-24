@@ -66,6 +66,59 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Equipment_Type_Length", "length(Type) <= 100");
                         });
                 });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Measurement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EquipmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("MeasuredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Value")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EquipmentId", "MeasuredAtUtc");
+
+                    b.HasIndex("EquipmentId", "Type", "MeasuredAtUtc");
+
+                    b.ToTable("Measurements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Measurements_Type_Allowed", "Type IN ('Temperature', 'Voltage', 'Load')");
+                        });
+                });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Measurement", b =>
+                {
+                    b.HasOne("EquipmentMonitoring.Domain.Entities.Equipment", "Equipment")
+                        .WithMany("Measurements")
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+                });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Equipment", b =>
+                {
+                    b.Navigation("Measurements");
+                });
 #pragma warning restore 612, 618
         }
     }

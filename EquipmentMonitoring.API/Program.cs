@@ -29,8 +29,11 @@ var resolvedConnectionString = sqliteConnectionStringBuilder.ToString();
 builder.Services.AddDbContext<EquipmentMonitoringDbContext>(options =>
     options.UseSqlite(resolvedConnectionString));
 builder.Services.AddScoped<IEquipmentRepository, EquipmentRepository>();
+builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<CreateEquipmentValidator>();
 builder.Services.AddScoped<EquipmentRegistrationValidator>();
+builder.Services.AddScoped<CreateMeasurementValidator>();
+builder.Services.AddScoped<MeasurementRegistrationValidator>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -63,3 +66,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;

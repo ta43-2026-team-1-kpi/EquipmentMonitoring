@@ -16,6 +16,8 @@ namespace EquipmentMonitoring.Domain.Entities
 
         public EquipmentStatus Status { get; private set; }
 
+        public ICollection<Measurement> Measurements { get; private set; } = [];
+
         public Equipment(string name, string type, string serialNumber, string location, EquipmentStatus status)
         {
             Id = Guid.NewGuid();
