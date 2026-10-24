@@ -1,3 +1,4 @@
+using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
 using EquipmentMonitoring.Infrastructure.Persistence;
@@ -97,7 +98,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure
         }
 
         [Fact]
-        public async Task SaveChangesAsync_WithDuplicateSerialNumber_ShouldThrowDbUpdateExceptionWithSqliteUniqueCode()
+        public async Task SaveChangesAsync_WithDuplicateSerialNumber_ShouldThrowApplicationExceptionWithSqliteUniqueCode()
         {
             await using var connection = await CreateOpenConnectionAsync();
             await MigrateAsync(connection);
@@ -110,10 +111,13 @@ namespace EquipmentMonitoring.Tests.Infrastructure
 
             await repository.AddAsync(new Equipment("Equipment B", "Type", "SN-UNIQ-001", "L2", EquipmentStatus.Faulty));
 
-            var exception = await Assert.ThrowsAsync<DbUpdateException>(
+            var exception = await Assert.ThrowsAsync<DuplicateEquipmentSerialNumberException>(
                 () => repository.SaveChangesAsync());
 
-            var sqliteException = exception.InnerException as SqliteException;
+            var dbUpdateException = exception.InnerException as DbUpdateException;
+            Assert.NotNull(dbUpdateException);
+
+            var sqliteException = dbUpdateException.InnerException as SqliteException;
             Assert.NotNull(sqliteException);
             Assert.Equal(SqliteConstraintUniqueExtendedErrorCode, sqliteException.SqliteExtendedErrorCode);
         }

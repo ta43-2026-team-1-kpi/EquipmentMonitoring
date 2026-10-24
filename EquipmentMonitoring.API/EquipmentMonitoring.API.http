@@ -1,6 +1,64 @@
-@EquipmentMonitoring.API_HostAddress = http://localhost:5190
+@EquipmentMonitoring.API_HostAddress = https://localhost:7114
 
-GET {{EquipmentMonitoring.API_HostAddress}}/weatherforecast/
+### Реєстрація обладнання
+POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment
+Content-Type: application/json
 Accept: application/json
+
+{
+  "name": "Compressor A1",
+  "type": "Compressor",
+  "serialNumber": "SN-2026-0001",
+  "location": "Workshop 1",
+  "status": "Working"
+}
+
+###
+
+### Отримати весь перелік обладнання
+GET {{EquipmentMonitoring.API_HostAddress}}/api/equipment
+Accept: application/json
+
+###
+
+### Фільтрація за статусом
+GET {{EquipmentMonitoring.API_HostAddress}}/api/equipment?status=Working
+Accept: application/json
+
+###
+
+### Некоректні дані (порожні поля)
+POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "",
+  "type": "Compressor",
+  "serialNumber": "",
+  "location": "Workshop 1",
+  "status": null
+}
+
+###
+
+### Некоректний параметр status у query
+GET {{EquipmentMonitoring.API_HostAddress}}/api/equipment?status=999
+Accept: application/json
+
+###
+
+### Повторний серійний номер (очікується 400)
+POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Compressor B1",
+  "type": "Compressor",
+  "serialNumber": "SN-2026-0001",
+  "location": "Workshop 2",
+  "status": "Working"
+}
 
 ###

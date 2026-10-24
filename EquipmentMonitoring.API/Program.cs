@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
+using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Infrastructure.Persistence;
 using EquipmentMonitoring.Infrastructure.Persistence.Repositories;
 using Microsoft.Data.Sqlite;
@@ -26,8 +28,14 @@ var resolvedConnectionString = sqliteConnectionStringBuilder.ToString();
 builder.Services.AddDbContext<EquipmentMonitoringDbContext>(options =>
     options.UseSqlite(resolvedConnectionString));
 builder.Services.AddScoped<IEquipmentRepository, EquipmentRepository>();
+builder.Services.AddScoped<CreateEquipmentValidator>();
+builder.Services.AddScoped<EquipmentRegistrationValidator>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
