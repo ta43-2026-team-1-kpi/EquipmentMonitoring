@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EquipmentMonitoring.API\EquipmentMonitoring.API.csproj" />
     <ProjectReference Include="..\EquipmentMonitoring.Application\EquipmentMonitoring.Application.csproj" />
     <ProjectReference Include="..\EquipmentMonitoring.Domain\EquipmentMonitoring.Domain.csproj" />
     <ProjectReference Include="..\EquipmentMonitoring.Infrastructure\EquipmentMonitoring.Infrastructure.csproj" />
