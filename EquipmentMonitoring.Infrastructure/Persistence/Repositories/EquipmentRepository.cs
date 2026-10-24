@@ -50,6 +50,15 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
                 cancellationToken);
         }
 
+        public Task<bool> ExistsByIdAsync(
+            Guid equipmentId,
+            CancellationToken cancellationToken = default)
+        {
+            return _dbContext.Equipment.AnyAsync(
+                e => e.Id == equipmentId,
+                cancellationToken);
+        }
+
         public async Task<int> SaveChangesAsync(
             CancellationToken cancellationToken = default)
         {

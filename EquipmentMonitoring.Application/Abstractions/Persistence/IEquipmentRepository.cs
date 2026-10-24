@@ -15,6 +15,10 @@ namespace EquipmentMonitoring.Application.Abstractions.Persistence
             string serialNumber,
             CancellationToken cancellationToken = default);
 
+        Task<bool> ExistsByIdAsync(
+            Guid equipmentId,
+            CancellationToken cancellationToken = default);
+
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }

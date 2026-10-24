@@ -105,6 +105,13 @@ namespace EquipmentMonitoring.Tests.Application
                 return Task.FromResult(ExistsBySerialNumberResult);
             }
 
+            public Task<bool> ExistsByIdAsync(
+                Guid equipmentId,
+                CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(false);
+            }
+
             public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
             {
                 return Task.FromResult(0);
