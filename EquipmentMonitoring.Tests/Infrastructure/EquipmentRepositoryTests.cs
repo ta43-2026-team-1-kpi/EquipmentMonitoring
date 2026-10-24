@@ -141,6 +141,69 @@ namespace EquipmentMonitoring.Tests.Infrastructure
             Assert.Empty(result);
         }
 
+        [Fact]
+        public async Task ExistsBySerialNumberAsync_WhenSerialNumberExists_ShouldReturnTrue()
+        {
+            await using var connection = await CreateOpenConnectionAsync();
+            await MigrateAsync(connection);
+
+            await using (var writeContext = CreateContext(connection))
+            {
+                var repository = new EquipmentRepository(writeContext);
+                await repository.AddAsync(new Equipment("Equipment A", "Type", "SN-001", "L1", EquipmentStatus.Working));
+                await repository.SaveChangesAsync();
+            }
+
+            await using var readContext = CreateContext(connection);
+            var readRepository = new EquipmentRepository(readContext);
+
+            var exists = await readRepository.ExistsBySerialNumberAsync("SN-001");
+
+            Assert.True(exists);
+        }
+
+        [Fact]
+        public async Task ExistsBySerialNumberAsync_WhenSerialNumberDoesNotExist_ShouldReturnFalse()
+        {
+            await using var connection = await CreateOpenConnectionAsync();
+            await MigrateAsync(connection);
+
+            await using (var writeContext = CreateContext(connection))
+            {
+                var repository = new EquipmentRepository(writeContext);
+                await repository.AddAsync(new Equipment("Equipment A", "Type", "SN-001", "L1", EquipmentStatus.Working));
+                await repository.SaveChangesAsync();
+            }
+
+            await using var readContext = CreateContext(connection);
+            var readRepository = new EquipmentRepository(readContext);
+
+            var exists = await readRepository.ExistsBySerialNumberAsync("SN-002");
+
+            Assert.False(exists);
+        }
+
+        [Fact]
+        public async Task ExistsBySerialNumberAsync_WhenCaseDiffers_ShouldReturnFalse()
+        {
+            await using var connection = await CreateOpenConnectionAsync();
+            await MigrateAsync(connection);
+
+            await using (var writeContext = CreateContext(connection))
+            {
+                var repository = new EquipmentRepository(writeContext);
+                await repository.AddAsync(new Equipment("Equipment A", "Type", "SN-001", "L1", EquipmentStatus.Working));
+                await repository.SaveChangesAsync();
+            }
+
+            await using var readContext = CreateContext(connection);
+            var readRepository = new EquipmentRepository(readContext);
+
+            var exists = await readRepository.ExistsBySerialNumberAsync("sn-001");
+
+            Assert.False(exists);
+        }
+
         private static async Task<SqliteConnection> CreateOpenConnectionAsync()
         {
             var connection = new SqliteConnection("Data Source=:memory:");

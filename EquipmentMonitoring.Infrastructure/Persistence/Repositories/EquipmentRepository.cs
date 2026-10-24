@@ -33,6 +33,15 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
             return await query.ToListAsync(cancellationToken);
         }
 
+        public Task<bool> ExistsBySerialNumberAsync(
+            string serialNumber,
+            CancellationToken cancellationToken = default)
+        {
+            return _dbContext.Equipment.AnyAsync(
+                e => e.SerialNumber == serialNumber,
+                cancellationToken);
+        }
+
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             return _dbContext.SaveChangesAsync(cancellationToken);
