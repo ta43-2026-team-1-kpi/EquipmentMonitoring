@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="EquipmentMonitoring.API/EquipmentMonitoring.API.csproj" />
+  <Project Path="EquipmentMonitoring.Application/EquipmentMonitoring.Application.csproj" />
+  <Project Path="EquipmentMonitoring.Domain/EquipmentMonitoring.Domain.csproj" />
+  <Project Path="EquipmentMonitoring.Infrastructure/EquipmentMonitoring.Infrastructure.csproj" />
+  <Project Path="EquipmentMonitoring.Tests/EquipmentMonitoring.Tests.csproj" />
+</Solution>

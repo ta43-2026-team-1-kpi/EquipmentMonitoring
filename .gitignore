@@ -1,0 +1,20 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build output
+**/bin/
+**/obj/
+
+# Test results
+TestResults/
+**/TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Local settings
+.env
+.env.*
+!.env.example

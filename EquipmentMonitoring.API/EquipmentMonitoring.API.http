@@ -1,0 +1,6 @@
+@EquipmentMonitoring.API_HostAddress = http://localhost:5190
+
+GET {{EquipmentMonitoring.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
