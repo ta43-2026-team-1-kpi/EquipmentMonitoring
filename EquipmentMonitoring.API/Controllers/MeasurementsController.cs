@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Measurement;
+using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
@@ -71,7 +72,21 @@ namespace EquipmentMonitoring.API.Controllers
                 measuredAtUtc);
 
             await _measurementRepository.AddAsync(measurement, cancellationToken);
-            await _measurementRepository.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _measurementRepository.SaveChangesAsync(cancellationToken);
+            }
+            catch (MeasurementEquipmentNotFoundException)
+            {
+                return NotFound(CreateValidationProblemDetails(
+                    new Dictionary<string, string[]>
+                    {
+                        ["equipmentId"] = ["Обладнання з таким ідентифікатором не знайдено."]
+                    },
+                    StatusCodes.Status404NotFound,
+                    "Обладнання не знайдено."));
+            }
 
             return StatusCode(StatusCodes.Status201Created, MapToDto(measurement));
         }

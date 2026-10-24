@@ -1,6 +1,7 @@
 using EquipmentMonitoring.API.Controllers;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Measurement;
+using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
@@ -48,6 +49,24 @@ namespace EquipmentMonitoring.Tests.API
             var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
             Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
             Assert.Equal(0, measurementRepository.AddCallsCount);
+        }
+
+        [Fact]
+        public async Task Post_WhenSaveChangesThrowsMissingEquipmentException_ShouldReturn404()
+        {
+            var equipmentRepository = new FakeEquipmentRepository { ExistsByIdResult = true };
+            var measurementRepository = new FakeMeasurementRepository
+            {
+                SaveChangesException = new MeasurementEquipmentNotFoundException(Guid.NewGuid())
+            };
+            var controller = CreateController(equipmentRepository, measurementRepository);
+
+            var result = await controller.CreateAsync(Guid.NewGuid(), CreateValidDto(), CancellationToken.None);
+
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+            Assert.Equal(1, measurementRepository.AddCallsCount);
+            Assert.Equal(1, measurementRepository.SaveChangesCallsCount);
         }
 
         [Fact]
@@ -165,6 +184,8 @@ namespace EquipmentMonitoring.Tests.API
 
             public int GetHistoryCallsCount { get; private set; }
 
+            public Exception? SaveChangesException { get; set; }
+
             public IReadOnlyList<Measurement> GetHistoryResult { get; set; } = [];
 
             public Task AddAsync(Measurement measurement, CancellationToken cancellationToken = default)
@@ -187,6 +208,12 @@ namespace EquipmentMonitoring.Tests.API
             public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
             {
                 SaveChangesCallsCount++;
+
+                if (SaveChangesException is not null)
+                {
+                    throw SaveChangesException;
+                }
+
                 return Task.FromResult(1);
             }
         }

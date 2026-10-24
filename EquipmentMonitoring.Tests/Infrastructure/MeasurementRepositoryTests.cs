@@ -1,3 +1,4 @@
+using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
 using EquipmentMonitoring.Infrastructure.Persistence;
@@ -88,7 +89,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure
         }
 
         [Fact]
-        public async Task AddAndSaveChangesAsync_WithUnknownEquipmentId_ShouldThrowDbUpdateException()
+        public async Task AddAndSaveChangesAsync_WithUnknownEquipmentId_ShouldThrowMissingEquipmentExceptionWithSqliteFkCode()
         {
             await using var connection = await CreateOpenConnectionAsync();
             await MigrateAsync(connection);
@@ -103,7 +104,13 @@ namespace EquipmentMonitoring.Tests.Infrastructure
                 "%",
                 new DateTime(2026, 10, 24, 11, 0, 0, DateTimeKind.Utc)));
 
-            await Assert.ThrowsAsync<DbUpdateException>(() => repository.SaveChangesAsync());
+            var exception = await Assert.ThrowsAsync<MeasurementEquipmentNotFoundException>(() => repository.SaveChangesAsync());
+
+            Assert.NotEqual(Guid.Empty, exception.EquipmentId);
+
+            var dbUpdateException = Assert.IsType<DbUpdateException>(exception.InnerException);
+            var sqliteException = Assert.IsType<SqliteException>(dbUpdateException.InnerException);
+            Assert.Equal(787, sqliteException.SqliteExtendedErrorCode);
         }
 
         [Fact]

@@ -1,12 +1,16 @@
 using EquipmentMonitoring.Application.Abstractions.Persistence;
+using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 {
     public class MeasurementRepository : IMeasurementRepository
     {
+        private const int SqliteConstraintForeignKeyExtendedErrorCode = 787;
+
         private readonly EquipmentMonitoringDbContext _dbContext;
 
         public MeasurementRepository(EquipmentMonitoringDbContext dbContext)
@@ -55,7 +59,43 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            return _dbContext.SaveChangesAsync(cancellationToken);
+            return SaveChangesInternalAsync(cancellationToken);
+        }
+
+        private async Task<int> SaveChangesInternalAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception)
+                when (IsMeasurementEquipmentForeignKeyViolation(exception))
+            {
+                var equipmentId = exception.Entries
+                    .Select(entry => entry.Entity)
+                    .OfType<Measurement>()
+                    .Select(measurement => measurement.EquipmentId)
+                    .FirstOrDefault();
+
+                throw new MeasurementEquipmentNotFoundException(equipmentId, exception);
+            }
+        }
+
+        private static bool IsMeasurementEquipmentForeignKeyViolation(DbUpdateException exception)
+        {
+            if (exception.InnerException is not SqliteException sqliteException)
+            {
+                return false;
+            }
+
+            if (sqliteException.SqliteExtendedErrorCode
+                != SqliteConstraintForeignKeyExtendedErrorCode)
+            {
+                return false;
+            }
+
+            return sqliteException.Message.Contains("FOREIGN KEY constraint failed", StringComparison.Ordinal)
+                || sqliteException.Message.Contains("FK_Measurements_Equipment_EquipmentId", StringComparison.Ordinal);
         }
     }
 }

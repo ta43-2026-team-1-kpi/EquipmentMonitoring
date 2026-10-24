@@ -214,7 +214,26 @@ namespace EquipmentMonitoring.API.OpenApi
             }
 
             post.Responses["201"] = CreateJsonResponse("Вимірювання успішно створено.", GetJsonSchema(post.Responses, "201"), CreateMeasurementPostSuccessExample());
-            post.Responses["400"] = CreateJsonResponse("Некоректні вхідні дані вимірювання.", GetJsonSchema(post.Responses, "400"), CreateMeasurementValidationErrorExample());
+
+            var measurementBadRequestSchema = GetJsonSchema(post.Responses, "400");
+            post.Responses["400"] = new OpenApiResponse
+            {
+                Description = "Некоректні вхідні дані вимірювання (бізнес-валідація або JSON/model-binding помилка).",
+                Content = new Dictionary<string, OpenApiMediaType>
+                {
+                    ["application/json"] = new OpenApiMediaType
+                    {
+                        Schema = measurementBadRequestSchema,
+                        Example = CreateMeasurementValidationErrorExample()
+                    },
+                    ["application/problem+json"] = new OpenApiMediaType
+                    {
+                        Schema = measurementBadRequestSchema,
+                        Example = CreateMeasurementModelBindingErrorExample()
+                    }
+                }
+            };
+
             post.Responses["404"] = CreateJsonResponse("Обладнання не знайдено.", GetJsonSchema(post.Responses, "404"), CreateMeasurementNotFoundErrorExample());
         }
 
@@ -296,6 +315,19 @@ namespace EquipmentMonitoring.API.OpenApi
               "serialNumber": "SN-2026-0001",
               "location": "Workshop 1",
               "status": "Working"
+            }
+            """)!;
+
+        private static JsonNode CreateMeasurementModelBindingErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+              "title": "One or more validation errors occurred.",
+              "status": 400,
+              "errors": {
+                "$.measuredAt": [
+                  "Поле MeasuredAt має містити часовий зсув або суфікс Z."
+                ]
+              }
             }
             """)!;
 
