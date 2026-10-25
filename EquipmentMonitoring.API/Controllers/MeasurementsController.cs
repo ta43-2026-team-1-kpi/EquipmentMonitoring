@@ -1,6 +1,7 @@
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Measurement;
 using EquipmentMonitoring.Application.Exceptions;
+using EquipmentMonitoring.Application.Monitoring;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
@@ -15,15 +16,18 @@ namespace EquipmentMonitoring.API.Controllers
         private readonly IEquipmentRepository _equipmentRepository;
         private readonly IMeasurementRepository _measurementRepository;
         private readonly MeasurementRegistrationValidator _measurementRegistrationValidator;
+        private readonly IMeasurementMonitor _measurementMonitor;
 
         public MeasurementsController(
             IEquipmentRepository equipmentRepository,
             IMeasurementRepository measurementRepository,
-            MeasurementRegistrationValidator measurementRegistrationValidator)
+            MeasurementRegistrationValidator measurementRegistrationValidator,
+            IMeasurementMonitor measurementMonitor)
         {
             _equipmentRepository = equipmentRepository;
             _measurementRepository = measurementRepository;
             _measurementRegistrationValidator = measurementRegistrationValidator;
+            _measurementMonitor = measurementMonitor;
         }
 
         [HttpPost]
@@ -66,6 +70,7 @@ namespace EquipmentMonitoring.API.Controllers
                 measuredAtUtc);
 
             await _measurementRepository.AddAsync(measurement, cancellationToken);
+            await _measurementMonitor.InspectAsync(measurement, cancellationToken);
 
             try
             {

@@ -28,6 +28,34 @@
 
 Після виконання або скасування робіт надішліть `PATCH /api/maintenance-plans/{maintenancePlanId}/status` з тілом `{"status":"Completed"}` або `{"status":"Cancelled"}`. Перехід дозволений тільки зі стану `Planned`; повторна зміна завершеного чи скасованого плану повертає `409 Conflict`.
 
+## Контроль допустимих значень і попередження (EPC-6)
+Кожне нове вимірювання автоматично порівнюється з допустимими межами. Якщо значення виходить за межу, створюється попередження. Вимірювання і попередження зберігаються в одній транзакції; відповідь `POST .../measurements` не змінилася.
+
+Межі задаються на двох рівнях:
+- **глобальна** — для типу показника, діє для всього обладнання: `/api/thresholds/{measurementType}`;
+- **для обладнання** — перекриває глобальну для цього обладнання, навіть якщо м'якша: `/api/equipment/{equipmentId}/thresholds/{measurementType}`.
+
+Правила:
+- потрібна хоча б одна межа (`minValue` або `maxValue`), `minValue ≤ maxValue`;
+- межі включні: значення, що дорівнює межі, попередження не створює;
+- межі задаються в канонічній одиниці типу (див. нижче);
+- попередження зберігає значення межі на момент створення, тому зміна чи видалення межі не змінює наявні попередження.
+
+| Метод | Шлях | Призначення |
+|---|---|---|
+| `GET` | `/api/thresholds` | глобальні межі |
+| `GET` / `PUT` / `DELETE` | `/api/thresholds/{measurementType}` | глобальна межа типу; `PUT` повертає `201` при створенні, `200` при оновленні |
+| `GET` | `/api/equipment/{equipmentId}/thresholds` | власні межі обладнання |
+| `GET` / `PUT` / `DELETE` | `/api/equipment/{equipmentId}/thresholds/{measurementType}` | власна межа обладнання |
+| `GET` | `/api/equipment/{equipmentId}/thresholds/effective` | межі, за якими зараз перевіряється обладнання |
+| `GET` | `/api/warnings` | попередження; без параметрів — активні, новіші спочатку |
+| `GET` | `/api/warnings/{warningId}` | попередження за id |
+| `POST` | `/api/warnings/{warningId}/acknowledge` | позначити опрацьованим (ідемпотентно) |
+
+Параметри `GET /api/warnings`: `equipmentId`, `status` (`Active` за замовчуванням, `Acknowledged`, `All`), `measurementType`, `page` (від 1), `pageSize` (1–200, за замовчуванням 50). Відповідь містить `items`, `page`, `pageSize`, `totalCount`, `totalPages`.
+
+Після оновлення з цією функціональністю застосуйте міграцію `AddThresholdsAndWarnings` командою `dotnet ef database update` (див. нижче).
+
 ## Домовленість одиниць вимірювання
 - `Temperature` → `°C`
 - `Voltage` → `V`
@@ -109,6 +137,7 @@ SQLite не потребує окремого сервера: під час мі
 ## Jira
 - EPC-4: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-4
 - EPC-5: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-5
+- EPC-6: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-6
 - EPC-33: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-33
 - EPC-27: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-27
 - EPC-28: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-28

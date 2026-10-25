@@ -1,11 +1,14 @@
 using System.Text.Json.Serialization;
 using EquipmentMonitoring.API.OpenApi;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
+using EquipmentMonitoring.Application.Monitoring;
+using EquipmentMonitoring.Application.Services;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Infrastructure.Persistence;
 using EquipmentMonitoring.Infrastructure.Persistence.Repositories;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +42,15 @@ builder.Services.AddScoped<CreateMaintenancePlanValidator>();
 builder.Services.AddScoped<MaintenancePlanRegistrationValidator>();
 builder.Services.AddScoped<UpdateMaintenancePlanStatusValidator>();
 
+builder.Services.TryAddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IThresholdRepository, ThresholdRepository>();
+builder.Services.AddScoped<IWarningRepository, WarningRepository>();
+builder.Services.AddScoped<UpsertThresholdValidator>();
+builder.Services.AddScoped<IMeasurementRule, ThresholdBreachRule>();
+builder.Services.AddScoped<IMeasurementMonitor, MeasurementMonitor>();
+builder.Services.AddScoped<ThresholdService>();
+builder.Services.AddScoped<WarningService>();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -48,6 +60,7 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<EquipmentOpenApiDocumentTransformer>();
+    options.AddDocumentTransformer<MonitoringOpenApiDocumentTransformer>();
 });
 
 var app = builder.Build();
