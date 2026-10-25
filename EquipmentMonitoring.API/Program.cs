@@ -56,6 +56,7 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<EquipmentOpenApiDocumentTransformer>();
+    options.AddDocumentTransformer<MonitoringOpenApiDocumentTransformer>();
 });
 
 var app = builder.Build();

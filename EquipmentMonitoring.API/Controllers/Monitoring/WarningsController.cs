@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Common;
 using EquipmentMonitoring.Application.DTOs.Warning;
@@ -10,9 +11,11 @@ namespace EquipmentMonitoring.API.Controllers.Monitoring
 {
     [ApiController]
     [Route("api/warnings")]
+    [Tags("Warnings")]
     public class WarningsController : MonitoringControllerBase
     {
         private const string AllStatuses = "All";
+        private const string WarningIdDescription = "Ідентифікатор попередження.";
 
         private readonly WarningService _warningService;
 
@@ -21,17 +24,18 @@ namespace EquipmentMonitoring.API.Controllers.Monitoring
             _warningService = warningService;
         }
 
-        /// <param name="status">Active (default), Acknowledged or All.</param>
         [HttpGet]
+        [EndpointSummary("Перелік попереджень")]
+        [EndpointDescription("Без параметрів повертає активні попередження, новіші спочатку (за часом створення). Фільтри поєднуються через AND.")]
         [ProducesResponseType<PagedResultDto<WarningDto>>(StatusCodes.Status200OK)]
         [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<PagedResultDto<WarningDto>>> SearchAsync(
-            [FromQuery] Guid? equipmentId,
-            [FromQuery] string? status,
-            [FromQuery] string? measurementType,
-            [FromQuery] int? page,
-            [FromQuery] int? pageSize,
+            [FromQuery, Description("Необов'язковий фільтр за обладнанням.")] Guid? equipmentId,
+            [FromQuery, Description("Active (за замовчуванням), Acknowledged або All.")] string? status,
+            [FromQuery, Description("Необов'язковий тип показника: Temperature, Voltage, Load.")] string? measurementType,
+            [FromQuery, Description("Номер сторінки, починаючи з 1. За замовчуванням 1.")] int? page,
+            [FromQuery, Description("Розмір сторінки від 1 до 200. За замовчуванням 50.")] int? pageSize,
             CancellationToken cancellationToken)
         {
             var errors = new Dictionary<string, List<string>>();
@@ -106,18 +110,26 @@ namespace EquipmentMonitoring.API.Controllers.Monitoring
         }
 
         [HttpGet("{warningId:guid}")]
+        [EndpointSummary("Попередження за ідентифікатором")]
+        [EndpointDescription("Повертає попередження незалежно від його стану.")]
         [ProducesResponseType<WarningDto>(StatusCodes.Status200OK)]
         [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<WarningDto>> GetAsync(Guid warningId, CancellationToken cancellationToken)
+        public async Task<ActionResult<WarningDto>> GetAsync(
+            [Description(WarningIdDescription)] Guid warningId,
+            CancellationToken cancellationToken)
         {
             var warning = await _warningService.GetAsync(warningId, cancellationToken);
             return warning is null ? WarningNotFound() : Ok(warning);
         }
 
         [HttpPost("{warningId:guid}/acknowledge")]
+        [EndpointSummary("Позначення попередження як опрацьованого")]
+        [EndpointDescription("Ідемпотентна операція: повторний виклик повертає попередження без змін і зберігає час першого підтвердження.")]
         [ProducesResponseType<WarningDto>(StatusCodes.Status200OK)]
         [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<WarningDto>> AcknowledgeAsync(Guid warningId, CancellationToken cancellationToken)
+        public async Task<ActionResult<WarningDto>> AcknowledgeAsync(
+            [Description(WarningIdDescription)] Guid warningId,
+            CancellationToken cancellationToken)
         {
             var warning = await _warningService.AcknowledgeAsync(warningId, cancellationToken);
             return warning is null ? WarningNotFound() : Ok(warning);
