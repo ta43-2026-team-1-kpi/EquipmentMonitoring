@@ -30,10 +30,14 @@ builder.Services.AddDbContext<EquipmentMonitoringDbContext>(options =>
     options.UseSqlite(resolvedConnectionString));
 builder.Services.AddScoped<IEquipmentRepository, EquipmentRepository>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
+builder.Services.AddScoped<IMaintenancePlanRepository, MaintenancePlanRepository>();
 builder.Services.AddScoped<CreateEquipmentValidator>();
 builder.Services.AddScoped<EquipmentRegistrationValidator>();
 builder.Services.AddScoped<CreateMeasurementValidator>();
 builder.Services.AddScoped<MeasurementRegistrationValidator>();
+builder.Services.AddScoped<CreateMaintenancePlanValidator>();
+builder.Services.AddScoped<MaintenancePlanRegistrationValidator>();
+builder.Services.AddScoped<UpdateMaintenancePlanStatusValidator>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

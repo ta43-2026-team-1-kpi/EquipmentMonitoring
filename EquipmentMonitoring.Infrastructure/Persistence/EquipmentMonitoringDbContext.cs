@@ -15,12 +15,15 @@ namespace EquipmentMonitoring.Infrastructure.Persistence
 
         public DbSet<Measurement> Measurements => Set<Measurement>();
 
+        public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
             modelBuilder.ApplyConfiguration(new EquipmentConfiguration());
             modelBuilder.ApplyConfiguration(new MeasurementConfiguration());
+            modelBuilder.ApplyConfiguration(new MaintenancePlanConfiguration());
         }
     }
 }

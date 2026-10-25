@@ -3,18 +3,30 @@
 ## Призначення
 **EquipmentMonitoring** — навчальний Web API-проєкт системи моніторингу обладнання на .NET 10.
 
-## Поточна реалізована функціональність (EPC-4, EPC-5)
+## Поточна реалізована функціональність (EPC-4, EPC-5, EPC-27–EPC-32)
 - Реєстрація обладнання: `POST /api/equipment`.
 - Отримання переліку обладнання: `GET /api/equipment`.
 - Фільтрація за станом: `GET /api/equipment?status=Working`.
 - Додавання вимірювання: `POST /api/equipment/{equipmentId}/measurements`.
 - Історія вимірювань: `GET /api/equipment/{equipmentId}/measurements`.
 - Фільтрація історії за типом та проміжком часу (`type`, `from`, `to`).
+- Створення плану технічного обслуговування: `POST /api/maintenance-plans`.
+- Перегляд планів, відсортованих за датою: `GET /api/maintenance-plans`; підтримується фільтр за `equipmentId`.
+- Зміна стану плану з `Planned` на `Completed` або `Cancelled`: `PATCH /api/maintenance-plans/{maintenancePlanId}/status`.
 - Валідація вхідних даних `CreateEquipmentDto`.
 - Валідація вхідних даних `CreateMeasurementDto` (обов’язкові Type/Value/Unit/MeasuredAt, finite-числа, перевірка одиниць).
+- Валідація планів обслуговування та перевірка, що обладнання зареєстроване.
 - Перевірка унікальності `SerialNumber` (попередня перевірка + обробка конфлікту унікальності під час збереження).
 - Збереження даних у SQLite через EF Core міграції.
 - OpenAPI-документ та Swagger UI для документації API.
+
+## Планування технічного обслуговування
+
+Для створення плану передайте ідентифікатор зареєстрованого обладнання, заплановану дату у форматі `yyyy-MM-dd`, вид робіт, відповідального працівника та необов’язкову примітку. Новий запис автоматично отримує стан `Planned`.
+
+`GET /api/maintenance-plans` повертає всі плани у порядку зростання `plannedDate`. Щоб переглянути плани лише для одного пристрою, додайте `?equipmentId=<GUID>`.
+
+Після виконання або скасування робіт надішліть `PATCH /api/maintenance-plans/{maintenancePlanId}/status` з тілом `{"status":"Completed"}` або `{"status":"Cancelled"}`. Перехід дозволений тільки зі стану `Planned`; повторна зміна завершеного чи скасованого плану повертає `409 Conflict`.
 
 ## Домовленість одиниць вимірювання
 - `Temperature` → `°C`
@@ -84,6 +96,8 @@ SQLite не потребує окремого сервера: під час мі
 2. Скопіюйте `id` зі відповіді.
 3. У `.http` файлі замініть `@EquipmentId` на реальний `id`.
 
+Для EPC-27–EPC-32 спершу зареєструйте обладнання та скопіюйте його `id` у `@EquipmentId`. Створіть план через `POST /api/maintenance-plans`, скопіюйте повернений `id` у `@MaintenancePlanId`, а потім перевірте список і зміну стану прикладами з `.http` файлу.
+
 Для вимірювань використовуйте узгоджені одиниці:
 - `Temperature` → `°C`
 - `Voltage` → `V`
@@ -96,3 +110,9 @@ SQLite не потребує окремого сервера: під час мі
 - EPC-4: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-4
 - EPC-5: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-5
 - EPC-33: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-33
+- EPC-27: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-27
+- EPC-28: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-28
+- EPC-29: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-29
+- EPC-30: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-30
+- EPC-31: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-31
+- EPC-32: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-32
