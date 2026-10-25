@@ -1,5 +1,6 @@
 @EquipmentMonitoring.API_HostAddress = https://localhost:7114
 @EquipmentId = 00000000-0000-0000-0000-000000000000
+@MaintenancePlanId = 00000000-0000-0000-0000-000000000000
 
 ### Реєстрація обладнання
 POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment
@@ -86,6 +87,44 @@ Accept: application/json
 ### Некоректний параметр status у query
 GET {{EquipmentMonitoring.API_HostAddress}}/api/equipment?status=999
 Accept: application/json
+
+###
+
+### Створити план технічного обслуговування для зареєстрованого обладнання
+POST {{EquipmentMonitoring.API_HostAddress}}/api/maintenance-plans
+Content-Type: application/json
+Accept: application/json
+
+{
+  "equipmentId": "{{EquipmentId}}",
+  "plannedDate": "2026-11-12",
+  "workType": "Annual inspection",
+  "responsibleEmployee": "Olena Kovalenko",
+  "note": "Check the safety valves"
+}
+
+###
+
+### Усі плани технічного обслуговування, відсортовані за датою
+GET {{EquipmentMonitoring.API_HostAddress}}/api/maintenance-plans
+Accept: application/json
+
+###
+
+### Плани для одного обладнання
+GET {{EquipmentMonitoring.API_HostAddress}}/api/maintenance-plans?equipmentId={{EquipmentId}}
+Accept: application/json
+
+###
+
+### Позначити план як виконаний (або використайте Cancelled)
+PATCH {{EquipmentMonitoring.API_HostAddress}}/api/maintenance-plans/{{MaintenancePlanId}}/status
+Content-Type: application/json
+Accept: application/json
+
+{
+  "status": "Completed"
+}
 
 ###
 

@@ -1,5 +1,6 @@
 using EquipmentMonitoring.Application.DTOs.Equipment;
 using EquipmentMonitoring.Application.DTOs.Measurement;
+using EquipmentMonitoring.Application.DTOs.Maintenance;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
@@ -18,6 +19,7 @@ namespace EquipmentMonitoring.API.OpenApi
             ConfigureSchemas(document);
             ConfigureEquipmentEndpoints(document);
             ConfigureMeasurementEndpoints(document);
+            ConfigureMaintenancePlanEndpoints(document);
 
             return Task.CompletedTask;
         }
@@ -116,6 +118,34 @@ namespace EquipmentMonitoring.API.OpenApi
                 }
             }
 
+            if (document.Components.Schemas.TryGetValue(nameof(CreateMaintenancePlanDto), out var createMaintenancePlanSchema))
+            {
+                createMaintenancePlanSchema.Description = "Запит на створення плану технічного обслуговування. Обов’язкові EquipmentId, PlannedDate, WorkType та ResponsibleEmployee; Note необов’язкове.";
+                ConfigureTextProperty(createMaintenancePlanSchema, nameof(CreateMaintenancePlanDto.WorkType), "Вид запланованих робіт. Обов’язкове поле, максимум 200 символів.");
+                ConfigureTextProperty(createMaintenancePlanSchema, nameof(CreateMaintenancePlanDto.ResponsibleEmployee), "Відповідальний працівник. Обов’язкове поле, максимум 200 символів.");
+                ConfigureTextProperty(createMaintenancePlanSchema, nameof(CreateMaintenancePlanDto.Note), "Необов’язкова примітка, максимум 1000 символів.");
+            }
+
+            if (document.Components.Schemas.TryGetValue(nameof(MaintenancePlanDto), out var maintenancePlanSchema))
+            {
+                maintenancePlanSchema.Description = "План технічного обслуговування зареєстрованого обладнання.";
+                ConfigureTextProperty(maintenancePlanSchema, nameof(MaintenancePlanDto.WorkType), "Вид робіт.");
+                ConfigureTextProperty(maintenancePlanSchema, nameof(MaintenancePlanDto.ResponsibleEmployee), "Відповідальний працівник.");
+                ConfigureTextProperty(maintenancePlanSchema, nameof(MaintenancePlanDto.Note), "Примітка до робіт, якщо вказана.");
+
+                if (maintenancePlanSchema.Properties?.TryGetValue(nameof(MaintenancePlanDto.Status), out var statusProperty) == true)
+                {
+                    statusProperty.Description = "Стан плану: Planned, Completed або Cancelled.";
+                }
+            }
+
+            if (document.Components.Schemas.TryGetValue(nameof(UpdateMaintenancePlanStatusDto), out var updateMaintenancePlanStatusSchema)
+                && updateMaintenancePlanStatusSchema.Properties?.TryGetValue(nameof(UpdateMaintenancePlanStatusDto.Status), out var maintenanceStatusProperty) == true)
+            {
+                updateMaintenancePlanStatusSchema.Description = "Зміна стану плану зі стану Planned на Completed або Cancelled.";
+                maintenanceStatusProperty.Description = "Допустимі нові стани: Completed або Cancelled.";
+            }
+
             if (document.Components.Schemas.TryGetValue(nameof(ValidationProblemDetails), out var validationProblemSchema))
             {
                 validationProblemSchema.Description = "Формат помилки валідації. Деталі по полях знаходяться в errors.";
@@ -146,6 +176,145 @@ namespace EquipmentMonitoring.API.OpenApi
 
             ConfigureMeasurementPost(path.Value);
             ConfigureMeasurementGet(path.Value);
+        }
+
+        private static void ConfigureMaintenancePlanEndpoints(OpenApiDocument document)
+        {
+            var collectionPath = document.Paths.FirstOrDefault(
+                path => string.Equals(
+                    path.Key,
+                    "/api/maintenance-plans",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (!collectionPath.Equals(default(KeyValuePair<string, IOpenApiPathItem>)))
+            {
+                ConfigureMaintenancePlanPost(collectionPath.Value);
+                ConfigureMaintenancePlanGet(collectionPath.Value);
+            }
+
+            var statusPath = document.Paths.FirstOrDefault(
+                path => string.Equals(
+                    path.Key,
+                    "/api/maintenance-plans/{maintenancePlanId}/status",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (!statusPath.Equals(default(KeyValuePair<string, IOpenApiPathItem>)))
+            {
+                ConfigureMaintenancePlanStatusPatch(statusPath.Value);
+            }
+        }
+
+        private static void ConfigureMaintenancePlanPost(IOpenApiPathItem pathItem)
+        {
+            if (pathItem.Operations is not { } operations
+                || !operations.TryGetValue(HttpMethod.Post, out var post)
+                || post is null)
+            {
+                return;
+            }
+
+            var responses = post.Responses ??= new OpenApiResponses();
+            responses.Remove("200");
+            post.Summary = "Створення плану технічного обслуговування";
+            post.Description = "Створює план для зареєстрованого обладнання зі станом Planned.";
+
+            var requestContent = post.RequestBody?.Content;
+            if (requestContent?.TryGetValue("application/json", out var requestJson) == true)
+            {
+                requestContent["application/json"] = new OpenApiMediaType
+                {
+                    Schema = requestJson.Schema,
+                    Example = CreateMaintenancePlanPostRequestExample()
+                };
+            }
+
+            responses["201"] = CreateJsonResponse(
+                "План технічного обслуговування успішно створено.",
+                GetJsonSchema(responses, "201"),
+                CreateMaintenancePlanSuccessExample());
+            responses["400"] = CreateJsonResponse(
+                "Некоректні вхідні дані плану.",
+                GetJsonSchema(responses, "400"),
+                CreateMaintenancePlanValidationErrorExample());
+            responses["404"] = CreateJsonResponse(
+                "Обладнання не знайдено.",
+                GetJsonSchema(responses, "404"),
+                CreateMaintenancePlanNotFoundErrorExample());
+        }
+
+        private static void ConfigureMaintenancePlanGet(IOpenApiPathItem pathItem)
+        {
+            if (pathItem.Operations is not { } operations
+                || !operations.TryGetValue(HttpMethod.Get, out var get)
+                || get is null)
+            {
+                return;
+            }
+
+            get.Summary = "Перелік планів технічного обслуговування";
+            get.Description = "Повертає плани, відсортовані за запланованою датою за зростанням. equipmentId необов’язковий.";
+
+            var equipmentIdParameter = get.Parameters?.FirstOrDefault(
+                parameter => string.Equals(parameter.Name, "equipmentId", StringComparison.Ordinal));
+            if (equipmentIdParameter is not null)
+            {
+                equipmentIdParameter.Description = "Необов’язковий фільтр за ідентифікатором зареєстрованого обладнання.";
+            }
+
+            var responses = get.Responses ??= new OpenApiResponses();
+            responses["200"] = CreateJsonResponse(
+                "Успішно. Повертає масив MaintenancePlanDto, відсортований за датою.",
+                GetJsonSchema(responses, "200"),
+                CreateMaintenancePlanListExample());
+            responses["400"] = CreateJsonResponse(
+                "Некоректний параметр equipmentId.",
+                GetJsonSchema(responses, "400"),
+                CreateMaintenancePlanValidationErrorExample());
+            responses["404"] = CreateJsonResponse(
+                "Обладнання для фільтра не знайдено.",
+                GetJsonSchema(responses, "404"),
+                CreateMaintenancePlanNotFoundErrorExample());
+        }
+
+        private static void ConfigureMaintenancePlanStatusPatch(IOpenApiPathItem pathItem)
+        {
+            if (pathItem.Operations is not { } operations
+                || !operations.TryGetValue(HttpMethod.Patch, out var patch)
+                || patch is null)
+            {
+                return;
+            }
+
+            patch.Summary = "Зміна стану плану технічного обслуговування";
+            patch.Description = "Змінює стан плану Planned на Completed або Cancelled.";
+
+            var requestContent = patch.RequestBody?.Content;
+            if (requestContent?.TryGetValue("application/json", out var requestJson) == true)
+            {
+                requestContent["application/json"] = new OpenApiMediaType
+                {
+                    Schema = requestJson.Schema,
+                    Example = CreateMaintenancePlanStatusRequestExample()
+                };
+            }
+
+            var responses = patch.Responses ??= new OpenApiResponses();
+            responses["200"] = CreateJsonResponse(
+                "Стан плану успішно змінено.",
+                GetJsonSchema(responses, "200"),
+                CreateMaintenancePlanSuccessExample());
+            responses["400"] = CreateJsonResponse(
+                "Дозволено змінювати стан лише на Completed або Cancelled.",
+                GetJsonSchema(responses, "400"),
+                CreateMaintenancePlanStatusErrorExample());
+            responses["404"] = CreateJsonResponse(
+                "План технічного обслуговування не знайдено.",
+                GetJsonSchema(responses, "404"),
+                CreateMaintenancePlanPlanNotFoundErrorExample());
+            responses["409"] = CreateJsonResponse(
+                "Стан плану вже змінено; завершені або скасовані плани не можна змінити повторно.",
+                GetJsonSchema(responses, "409"),
+                CreateMaintenancePlanConflictErrorExample());
         }
 
         private static void ConfigureEquipmentPost(IOpenApiPathItem pathItem)
@@ -453,6 +622,104 @@ namespace EquipmentMonitoring.API.OpenApi
               "errors": {
                 "from": ["Параметр from не може бути пізнішим за to."],
                 "to": ["Параметр to не може бути ранішим за from."]
+              }
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanPostRequestExample() => JsonNode.Parse("""
+            {
+              "equipmentId": "8d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+              "plannedDate": "2026-11-12",
+              "workType": "Annual inspection",
+              "responsibleEmployee": "Olena Kovalenko",
+              "note": "Check the safety valves"
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanSuccessExample() => JsonNode.Parse("""
+            {
+              "id": "9d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+              "equipmentId": "8d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+              "plannedDate": "2026-11-12",
+              "workType": "Annual inspection",
+              "responsibleEmployee": "Olena Kovalenko",
+              "note": "Check the safety valves",
+              "status": "Planned"
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanListExample() => JsonNode.Parse("""
+            [
+              {
+                "id": "9d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+                "equipmentId": "8d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+                "plannedDate": "2026-11-12",
+                "workType": "Annual inspection",
+                "responsibleEmployee": "Olena Kovalenko",
+                "note": "Check the safety valves",
+                "status": "Planned"
+              }
+            ]
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanStatusRequestExample() => JsonNode.Parse("""
+            {
+              "status": "Completed"
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanValidationErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+              "title": "Помилка валідації запиту.",
+              "status": 400,
+              "errors": {
+                "PlannedDate": ["Вкажіть заплановану дату обслуговування."],
+                "WorkType": ["Вкажіть вид робіт."]
+              }
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanStatusErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+              "title": "Помилка валідації запиту.",
+              "status": 400,
+              "errors": {
+                "Status": ["Стан можна змінити лише на Completed або Cancelled."]
+              }
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanNotFoundErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+              "title": "Обладнання не знайдено.",
+              "status": 404,
+              "errors": {
+                "EquipmentId": ["Обладнання з таким ідентифікатором не знайдено."]
+              }
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanPlanNotFoundErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+              "title": "План технічного обслуговування не знайдено.",
+              "status": 404,
+              "errors": {
+                "maintenancePlanId": ["План технічного обслуговування не знайдено."]
+              }
+            }
+            """)!;
+
+        private static JsonNode CreateMaintenancePlanConflictErrorExample() => JsonNode.Parse("""
+            {
+              "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+              "title": "Стан плану вже змінено.",
+              "status": 409,
+              "errors": {
+                "Status": ["Змінити стан можна лише для плану зі станом Planned."]
               }
             }
             """)!;

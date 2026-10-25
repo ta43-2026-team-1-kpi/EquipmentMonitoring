@@ -15,6 +15,7 @@ namespace EquipmentMonitoring.Infrastructure.Persistence
 
         public DbSet<Measurement> Measurements => Set<Measurement>();
 
+        public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
         public DbSet<Threshold> Thresholds => Set<Threshold>();
 
         public DbSet<Warning> Warnings => Set<Warning>();
@@ -25,6 +26,7 @@ namespace EquipmentMonitoring.Infrastructure.Persistence
 
             modelBuilder.ApplyConfiguration(new EquipmentConfiguration());
             modelBuilder.ApplyConfiguration(new MeasurementConfiguration());
+            modelBuilder.ApplyConfiguration(new MaintenancePlanConfiguration());
             modelBuilder.ApplyConfiguration(new ThresholdConfiguration());
             modelBuilder.ApplyConfiguration(new WarningConfiguration());
         }
