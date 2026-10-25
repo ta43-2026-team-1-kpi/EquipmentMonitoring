@@ -2,11 +2,14 @@ using EquipmentMonitoring.API.Controllers;
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Measurement;
 using EquipmentMonitoring.Application.Exceptions;
+using EquipmentMonitoring.Application.Monitoring;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
 using Microsoft.AspNetCore.Http;
+using EquipmentMonitoring.Tests.TestDoubles;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EquipmentMonitoring.Tests.API
 {
@@ -126,7 +129,8 @@ namespace EquipmentMonitoring.Tests.API
             return new MeasurementsController(
                 equipmentRepository,
                 measurementRepository,
-                registrationValidator)
+                registrationValidator,
+                new MeasurementMonitor([], new InMemoryWarningRepository(), NullLogger<MeasurementMonitor>.Instance))
             {
                 ControllerContext = new ControllerContext
                 {
