@@ -103,3 +103,91 @@ Accept: application/json
 }
 
 ###
+
+### ---------- EPC-6: допустимі межі та попередження ----------
+@WarningId = 00000000-0000-0000-0000-000000000000
+
+### Встановити глобальну межу температури (201 — створено, 200 — оновлено)
+PUT {{EquipmentMonitoring.API_HostAddress}}/api/thresholds/Temperature
+Content-Type: application/json
+Accept: application/json
+
+{
+  "minValue": -10,
+  "maxValue": 80
+}
+
+###
+
+### Глобальні межі
+GET {{EquipmentMonitoring.API_HostAddress}}/api/thresholds
+Accept: application/json
+
+###
+
+### Власна межа навантаження для обладнання (лише максимум)
+PUT {{EquipmentMonitoring.API_HostAddress}}/api/equipment/{{EquipmentId}}/thresholds/Load
+Content-Type: application/json
+Accept: application/json
+
+{
+  "minValue": null,
+  "maxValue": 70
+}
+
+###
+
+### Чинні межі обладнання (власні мають пріоритет над глобальними)
+GET {{EquipmentMonitoring.API_HostAddress}}/api/equipment/{{EquipmentId}}/thresholds/effective
+Accept: application/json
+
+###
+
+### Вимірювання вище межі — створює попередження
+POST {{EquipmentMonitoring.API_HostAddress}}/api/equipment/{{EquipmentId}}/measurements
+Content-Type: application/json
+Accept: application/json
+
+{
+  "type": "Temperature",
+  "value": 92.5,
+  "unit": "°C",
+  "measuredAt": "2026-10-25T12:00:00Z"
+}
+
+###
+
+### Активні попередження
+GET {{EquipmentMonitoring.API_HostAddress}}/api/warnings
+Accept: application/json
+
+###
+
+### Попередження обладнання за типом, усі стани, друга сторінка
+GET {{EquipmentMonitoring.API_HostAddress}}/api/warnings?equipmentId={{EquipmentId}}&measurementType=Temperature&status=All&page=2&pageSize=20
+Accept: application/json
+
+###
+
+### Позначити попередження опрацьованим (підставте id у @WarningId)
+POST {{EquipmentMonitoring.API_HostAddress}}/api/warnings/{{WarningId}}/acknowledge
+Accept: application/json
+
+###
+
+### Некоректні межі: min > max (очікується 400)
+PUT {{EquipmentMonitoring.API_HostAddress}}/api/thresholds/Voltage
+Content-Type: application/json
+Accept: application/json
+
+{
+  "minValue": 250,
+  "maxValue": 200
+}
+
+###
+
+### Видалити власну межу обладнання (після цього діє глобальна)
+DELETE {{EquipmentMonitoring.API_HostAddress}}/api/equipment/{{EquipmentId}}/thresholds/Load
+
+###

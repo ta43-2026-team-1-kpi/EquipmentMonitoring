@@ -104,6 +104,133 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Threshold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("EquipmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("MaxValue")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("MeasurementType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("MinValue")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MeasurementType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Thresholds_Global_MeasurementType")
+                        .HasFilter("EquipmentId IS NULL");
+
+                    b.HasIndex("EquipmentId", "MeasurementType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Thresholds_EquipmentId_MeasurementType")
+                        .HasFilter("EquipmentId IS NOT NULL");
+
+                    b.ToTable("Thresholds", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Thresholds_AtLeastOneLimit", "MinValue IS NOT NULL OR MaxValue IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Thresholds_MeasurementType_Allowed", "MeasurementType IN ('Temperature', 'Voltage', 'Load')");
+
+                            t.HasCheckConstraint("CK_Thresholds_MinNotGreaterThanMax", "MinValue IS NULL OR MaxValue IS NULL OR MinValue <= MaxValue");
+                        });
+                });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Warning", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("AcknowledgedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("ActualValue")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("BreachType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EquipmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("LimitValue")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("MeasuredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("MeasurementId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MeasurementType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ThresholdId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ThresholdScope")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MeasurementId", "ThresholdId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.HasIndex("EquipmentId", "Status", "CreatedAtUtc");
+
+                    b.ToTable("Warnings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Warnings_Acknowledgement_Consistent", "(Status = 'Active' AND AcknowledgedAtUtc IS NULL) OR (Status = 'Acknowledged' AND AcknowledgedAtUtc IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Warnings_BreachType_Allowed", "BreachType IN ('BelowMinimum', 'AboveMaximum')");
+
+                            t.HasCheckConstraint("CK_Warnings_MeasurementType_Allowed", "MeasurementType IN ('Temperature', 'Voltage', 'Load')");
+
+                            t.HasCheckConstraint("CK_Warnings_Status_Allowed", "Status IN ('Active', 'Acknowledged')");
+
+                            t.HasCheckConstraint("CK_Warnings_ThresholdScope_Allowed", "ThresholdScope IN ('Global', 'Equipment')");
+                        });
+                });
+
             modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Measurement", b =>
                 {
                     b.HasOne("EquipmentMonitoring.Domain.Entities.Equipment", "Equipment")
@@ -113,6 +240,35 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Equipment");
+                });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Threshold", b =>
+                {
+                    b.HasOne("EquipmentMonitoring.Domain.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Equipment");
+                });
+
+            modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Warning", b =>
+                {
+                    b.HasOne("EquipmentMonitoring.Domain.Entities.Equipment", "Equipment")
+                        .WithMany()
+                        .HasForeignKey("EquipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EquipmentMonitoring.Domain.Entities.Measurement", "Measurement")
+                        .WithMany()
+                        .HasForeignKey("MeasurementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Equipment");
+
+                    b.Navigation("Measurement");
                 });
 
             modelBuilder.Entity("EquipmentMonitoring.Domain.Entities.Equipment", b =>
