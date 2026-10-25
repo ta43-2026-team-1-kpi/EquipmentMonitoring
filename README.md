@@ -2,103 +2,52 @@
 
 ## Призначення
 
-**EquipmentMonitoring** — навчальний Web API-проєкт системи моніторингу обладнання на .NET 10.
+**EquipmentMonitoring** — навчальний ASP.NET Core Web API-проєкт для моніторингу обладнання.
 
-## EPC-4 — Реєстрація обладнання
+У поточній реалізації доступні Story:
+- **EPC-4** — реєстрація обладнання та перегляд переліку;
+- **EPC-5** — додавання вимірювань і перегляд історії;
+- **EPC-6** — межі (thresholds) та попередження (warnings);
+- **EPC-7** — плани технічного обслуговування.
 
-- Реєстрація обладнання: `POST /api/equipment`.
-- Отримання переліку обладнання: `GET /api/equipment`.
-- Фільтрація обладнання за станом: `GET /api/equipment?status=Working`.
-- Валідація вхідних даних `CreateEquipmentDto`.
-- Перевірка унікальності `SerialNumber`: попередня перевірка та обробка конфлікту унікальності під час збереження.
+## Структура рішення та технології
 
-## EPC-5 — Вимірювання обладнання
+Рішення містить 5 проєктів:
 
-- Додавання вимірювання: `POST /api/equipment/{equipmentId}/measurements`.
-- Перегляд історії вимірювань: `GET /api/equipment/{equipmentId}/measurements`.
-- Фільтрація історії за типом і проміжком часу (`type`, `from`, `to`).
-- Валідація `CreateMeasurementDto`: обов’язкові Type/Value/Unit/MeasuredAt, перевірка скінченності чисел і відповідності одиниць.
-- Час приймається в ISO 8601 лише з `Z` або явним часовим зсувом; у БД зберігається UTC, у відповіді повертається `measuredAtUtc`.
+- **EquipmentMonitoring.API** — HTTP-рівень (контролери, маршрути, Swagger/OpenAPI, DI).
+- **EquipmentMonitoring.Domain** — доменні сутності та enum.
+- **EquipmentMonitoring.Application** — DTO, валідація, прикладні сервіси, контракти, прикладні винятки.
+- **EquipmentMonitoring.Infrastructure** — EF Core, SQLite, конфігурації сутностей, репозиторії, міграції.
+- **EquipmentMonitoring.Tests** — unit та integration тести (xUnit).
 
-### Домовленість одиниць вимірювання
-
-- `Temperature` → `°C`
-- `Voltage` → `V`
-- `Load` → `%`
-
-### Формат дати й часу для вимірювань
-
-- Поле `measuredAt` приймається тільки у форматі ISO 8601 з `Z` або явним зсувом (`+02:00`, `-05:00`).
-- Дата без зсуву (наприклад, `2026-10-24T10:30:00`) відхиляється як `400`.
-- У БД час зберігається в UTC, у відповіді повертається `measuredAtUtc`.
-
-## EPC-6 — Контроль допустимих значень і попередження
-
-Кожне нове вимірювання автоматично порівнюється з допустимими межами. Якщо значення виходить за межу, створюється попередження. Вимірювання і попередження зберігаються в одній транзакції; відповідь `POST .../measurements` не змінилася.
-
-Межі задаються на двох рівнях:
-- **глобальна** — для типу показника, діє для всього обладнання: `/api/thresholds/{measurementType}`;
-- **для обладнання** — перекриває глобальну для цього обладнання, навіть якщо м'якша: `/api/equipment/{equipmentId}/thresholds/{measurementType}`.
-
-Правила:
-- потрібна хоча б одна межа (`minValue` або `maxValue`), `minValue ≤ maxValue`;
-- межі включні: значення, що дорівнює межі, попередження не створює;
-- межі задаються в канонічній одиниці типу (див. нижче);
-- попередження зберігає значення межі на момент створення, тому зміна чи видалення межі не змінює наявні попередження.
-
-| Метод | Шлях | Призначення |
-|---|---|---|
-| `GET` | `/api/thresholds` | глобальні межі |
-| `GET` / `PUT` / `DELETE` | `/api/thresholds/{measurementType}` | глобальна межа типу; `PUT` повертає `201` при створенні, `200` при оновленні |
-| `GET` | `/api/equipment/{equipmentId}/thresholds` | власні межі обладнання |
-| `GET` / `PUT` / `DELETE` | `/api/equipment/{equipmentId}/thresholds/{measurementType}` | власна межа обладнання |
-| `GET` | `/api/equipment/{equipmentId}/thresholds/effective` | межі, за якими зараз перевіряється обладнання |
-| `GET` | `/api/warnings` | попередження; без параметрів — активні, новіші спочатку |
-| `GET` | `/api/warnings/{warningId}` | попередження за id |
-| `POST` | `/api/warnings/{warningId}/acknowledge` | позначити опрацьованим (ідемпотентно) |
-
-Параметри `GET /api/warnings`: `equipmentId`, `status` (`Active` за замовчуванням, `Acknowledged`, `All`), `measurementType`, `page` (від 1), `pageSize` (1–200, за замовчуванням 50). Відповідь містить `items`, `page`, `pageSize`, `totalCount`, `totalPages`.
-
-Після оновлення з цією функціональністю застосуйте міграцію `AddThresholdsAndWarnings` командою `dotnet ef database update` (див. нижче).
-
-## EPC-7 — Планування технічного обслуговування
-
-Для створення плану передайте ідентифікатор зареєстрованого обладнання, заплановану дату у форматі `yyyy-MM-dd`, вид робіт, відповідального працівника та необов’язкову примітку. Новий запис автоматично отримує стан `Planned`.
-
-`GET /api/maintenance-plans` повертає всі плани у порядку зростання `plannedDate`. Щоб переглянути плани лише для одного пристрою, додайте `?equipmentId=<GUID>`.
-
-Після виконання або скасування робіт надішліть `PATCH /api/maintenance-plans/{maintenancePlanId}/status` з тілом `{"status":"Completed"}` або `{"status":"Cancelled"}`. Перехід дозволений тільки зі стану `Planned`; повторна зміна завершеного чи скасованого плану повертає `409 Conflict`.
-
-## Спільні технічні можливості
-
-- Збереження даних у SQLite через міграції EF Core.
-- OpenAPI-документ і Swagger UI для документації API.
-
-## Структура рішення
-
-- **EquipmentMonitoring.API** — HTTP-рівень, контролери, OpenAPI/Swagger, конфігурація DI.
-- **EquipmentMonitoring.Domain** — сутності та правила предметної області.
-- **EquipmentMonitoring.Application** — DTO, валідатори, прикладні контракти та винятки.
-- **EquipmentMonitoring.Infrastructure** — EF Core, SQLite, репозиторії, міграції.
-- **EquipmentMonitoring.Tests** — модульні та інтеграційні тести.
+Використані технології:
+- .NET 10 / ASP.NET Core Web API
+- Entity Framework Core 10 + SQLite
+- OpenAPI (`MapOpenApi`) + Swagger UI
+- xUnit
+- інструмент міграцій: `dotnet-ef` (tool manifest `dotnet-tools.json`)
 
 ## Передумови
 
-- **Git**
-- **.NET 10 SDK**
-- **Visual Studio** з підтримкою **.NET 10** та **ASP.NET**
+- Git
+- .NET 10 SDK
+- Visual Studio з підтримкою .NET 10 та ASP.NET
 
-## Запуск проєкту з нуля
+## Запуск після клонування (з нуля)
 
-1. Клонувати репозиторій:
+Усі команди виконуйте **з кореня репозиторію**.
+
+1. Клонування і перехід у каталог:
+
 ```bash
 git clone https://github.com/ta43-2026-team-1-kpi/EquipmentMonitoring.git
 cd EquipmentMonitoring
 ```
 
-2. Відкрити `EquipmentMonitoring.slnx` у Visual Studio.
+2. Відкрийте `EquipmentMonitoring.slnx` у Visual Studio.
 
-3. Виконати команди з кореня репозиторію в такій послідовності:
+3. Виконайте команди:
+
 ```bash
 dotnet restore
 dotnet tool restore
@@ -108,35 +57,136 @@ dotnet ef database update --project EquipmentMonitoring.Infrastructure --startup
 dotnet run --project EquipmentMonitoring.API --launch-profile https
 ```
 
-`dotnet run` займає поточний термінал. Для зупинки API натисніть `Ctrl+C`.
+`dotnet run` займає поточний термінал. Зупинка API: `Ctrl+C`.
 
-Якщо є проблема довіри до локального HTTPS-сертифіката:
+## Оновлення існуючої копії
+
+1. Зупиніть запущений API (`Ctrl+C`).
+2. Оновіть `master`:
+
+```bash
+git checkout master
+git pull origin master
+```
+
+3. Відновіть залежності та інструменти:
+
+```bash
+dotnet restore
+dotnet tool restore
+```
+
+4. Застосуйте міграції:
+
+```bash
+dotnet ef database update --project EquipmentMonitoring.Infrastructure --startup-project EquipmentMonitoring.API
+```
+
+5. Перевірте тести та запустіть API:
+
+```bash
+dotnet test
+dotnet run --project EquipmentMonitoring.API --launch-profile https
+```
+
+## Swagger і OpenAPI
+
+З `launchSettings.json` (профіль `https`) типові адреси:
+- `https://localhost:7114`
+- `http://localhost:5190`
+
+Документація:
+- Swagger UI: `https://localhost:7114/swagger`
+- OpenAPI JSON: `https://localhost:7114/openapi/v1.json`
+
+Фактичний URL завжди перевіряйте в консолі під час запуску.
+
+Якщо є проблема довіри до HTTPS-сертифіката:
+
 ```bash
 dotnet dev-certs https --trust
 ```
 
-SQLite не потребує окремого сервера: під час міграцій створюється власна порожня БД у папці `EquipmentMonitoring.API`.
-Після отримання нових міграцій потрібно повторити `dotnet ef database update`.
+## SQLite база даних
 
-## Документація API
+- Файл БД: `EquipmentMonitoring.API/equipment-monitoring.db`.
+- Окремий сервер БД не потрібен.
+- Файл БД не передається через Git.
+- Перше `dotnet ef database update` створює БД, наступні застосовують нові міграції зі збереженням даних відповідно до логіки міграцій.
 
-Після запуску перевіряйте фактичні адреси API в консолі.
+Для перегляду БД можна використовувати **DB Browser for SQLite**.
 
-- Swagger UI (типова адреса): `https://localhost:7114/swagger`
-- OpenAPI JSON: `<BASE_URL>/openapi/v1.json`
+## Endpoint-и (EPC-4 — EPC-7)
 
-## Приклади HTTP-запитів
+### EPC-4 (обладнання)
+- `POST /api/equipment`
+- `GET /api/equipment`
 
-Готові приклади запитів розміщені у файлі:
+### EPC-5 (вимірювання)
+- `POST /api/equipment/{equipmentId}/measurements`
+- `GET /api/equipment/{equipmentId}/measurements`
 
-- `EquipmentMonitoring.API/EquipmentMonitoring.API.http`
+### EPC-6 (межі та попередження)
+- `GET /api/thresholds`
+- `GET /api/thresholds/{measurementType}`
+- `PUT /api/thresholds/{measurementType}`
+- `DELETE /api/thresholds/{measurementType}`
+- `GET /api/equipment/{equipmentId}/thresholds`
+- `GET /api/equipment/{equipmentId}/thresholds/effective`
+- `GET /api/equipment/{equipmentId}/thresholds/{measurementType}`
+- `PUT /api/equipment/{equipmentId}/thresholds/{measurementType}`
+- `DELETE /api/equipment/{equipmentId}/thresholds/{measurementType}`
+- `GET /api/warnings`
+- `GET /api/warnings/{warningId}`
+- `POST /api/warnings/{warningId}/acknowledge`
 
-Послідовність для EPC-5:
-1. Спочатку створіть обладнання через `POST /api/equipment`.
-2. Скопіюйте `id` зі відповіді.
-3. У `.http` файлі замініть `@EquipmentId` на реальний `id`.
+### EPC-7 (плани ТО)
+- `POST /api/maintenance-plans`
+- `GET /api/maintenance-plans`
+- `PATCH /api/maintenance-plans/{maintenancePlanId}/status`
 
-Для EPC-27–EPC-32 спершу зареєструйте обладнання та скопіюйте його `id` у `@EquipmentId`. Створіть план через `POST /api/maintenance-plans`, скопіюйте повернений `id` у `@MaintenancePlanId`, а потім перевірте список і зміну стану прикладами з `.http` файлу.
+## Приклади послідовності роботи
+
+1. **Обладнання → вимірювання**
+   1) Створіть обладнання через `POST /api/equipment`.
+   2) Скопіюйте `id` з відповіді.
+   3) Додайте вимірювання через `POST /api/equipment/{equipmentId}/measurements`.
+
+2. **Межа → вимірювання поза межею → попередження**
+   1) Задайте межу (`PUT /api/thresholds/{measurementType}` або `PUT /api/equipment/{equipmentId}/thresholds/{measurementType}`).
+   2) Додайте вимірювання поза межами.
+   3) Перегляньте попередження через `GET /api/warnings`.
+
+3. **Створення плану → зміна стану**
+   1) Створіть план через `POST /api/maintenance-plans`.
+   2) Змініть стан через `PATCH /api/maintenance-plans/{maintenancePlanId}/status`.
+
+Готові приклади запитів: `EquipmentMonitoring.API/EquipmentMonitoring.API.http`.
+Для сценаріїв вимірювань у `.http` замініть `@EquipmentId` на реальний `id` обладнання.
+
+## Правила одиниць, часу та фільтрів
+
+- Одиниці вимірювання:
+  - `Temperature` → `°C`
+  - `Voltage` → `V`
+  - `Load` → `%`
+- Для вимірювань час передається у форматі `yyyy-MM-ddTHH:mm:ss[.fffffff](Z|±HH:mm)`.
+- `measuredAt`, `from`, `to` приймаються лише із `Z` або явним зсувом; значення нормалізуються до UTC.
+- У `GET /api/equipment/{equipmentId}/measurements` фільтри `type`, `from`, `to` необов’язкові, комбінуються через AND, межі часу включні.
+
+## Типові проблеми
+
+- **DLL заблоковані запущеним API**: зупиніть `dotnet run` (`Ctrl+C`) і повторіть `build/test`.
+- **`no such table ...`**: не застосовані міграції; виконайте `dotnet ef database update --project EquipmentMonitoring.Infrastructure --startup-project EquipmentMonitoring.API`.
+- **`localhost` недоступний**: API не запущено або використовується інший фактичний URL (перевірте консоль).
+
+## Jira
+
+- EPC-4: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-4
+- EPC-5: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-5
+- EPC-6: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-6
+- EPC-7: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-7
+- EPC-33: https://ta43-2026-team-1-kpi.atlassian.net/browse/EPC-33
 
 Для вимірювань використовуйте узгоджені одиниці:
 - `Temperature` → `°C`
