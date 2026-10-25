@@ -42,19 +42,23 @@ namespace EquipmentMonitoring.Tests.Domain
         }
 
         [Theory]
-        [InlineData(MaintenancePlanStatus.Planned)]
-        [InlineData(MaintenancePlanStatus.Completed)]
-        [InlineData(MaintenancePlanStatus.Cancelled)]
+        [InlineData(MaintenancePlanStatus.Completed, MaintenancePlanStatus.Planned)]
+        [InlineData(MaintenancePlanStatus.Completed, MaintenancePlanStatus.Completed)]
+        [InlineData(MaintenancePlanStatus.Completed, MaintenancePlanStatus.Cancelled)]
+        [InlineData(MaintenancePlanStatus.Cancelled, MaintenancePlanStatus.Planned)]
+        [InlineData(MaintenancePlanStatus.Cancelled, MaintenancePlanStatus.Completed)]
+        [InlineData(MaintenancePlanStatus.Cancelled, MaintenancePlanStatus.Cancelled)]
         public void TryChangeStatus_WhenAlreadyTerminal_ShouldNotChangeStatus(
+            MaintenancePlanStatus initialTerminalStatus,
             MaintenancePlanStatus secondStatus)
         {
             var plan = CreatePlan();
-            Assert.True(plan.TryChangeStatus(MaintenancePlanStatus.Completed));
+            Assert.True(plan.TryChangeStatus(initialTerminalStatus));
 
             var changed = plan.TryChangeStatus(secondStatus);
 
             Assert.False(changed);
-            Assert.Equal(MaintenancePlanStatus.Completed, plan.Status);
+            Assert.Equal(initialTerminalStatus, plan.Status);
         }
 
         private static MaintenancePlan CreatePlan()

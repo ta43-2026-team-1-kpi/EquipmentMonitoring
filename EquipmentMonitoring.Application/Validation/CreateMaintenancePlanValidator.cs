@@ -21,6 +21,13 @@ namespace EquipmentMonitoring.Application.Validation
             {
                 AddError(result, nameof(dto.PlannedDate), "Вкажіть заплановану дату обслуговування.");
             }
+            else if (dto.PlannedDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            {
+                AddError(
+                    result,
+                    nameof(dto.PlannedDate),
+                    "Запланована дата не може бути в минулому.");
+            }
 
             if (string.IsNullOrWhiteSpace(dto.WorkType))
             {

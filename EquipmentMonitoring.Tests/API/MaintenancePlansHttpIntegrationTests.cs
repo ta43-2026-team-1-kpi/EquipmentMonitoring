@@ -146,6 +146,24 @@ namespace EquipmentMonitoring.Tests.API
         }
 
         [Fact]
+        public async Task Post_WithPastPlannedDate_ShouldReturn400()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+            var equipmentId = await CreateEquipmentAsync(client);
+
+            var response = await PostPlanAsync(
+                client,
+                equipmentId,
+                "2020-01-01",
+                "Annual inspection",
+                "Olena Kovalenko",
+                null);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
         public async Task PatchStatus_ForMissingPlan_ShouldReturn404()
         {
             await using var factory = new CustomApiFactory();
@@ -176,6 +194,30 @@ namespace EquipmentMonitoring.Tests.API
             Assert.Equal(HttpStatusCode.OK, firstUpdate.StatusCode);
 
             var secondUpdate = await PatchStatusAsync(client, planId, "Cancelled");
+
+            Assert.Equal(HttpStatusCode.Conflict, secondUpdate.StatusCode);
+        }
+
+        [Fact]
+        public async Task PatchStatus_WhenPlanIsAlreadyCancelled_ShouldReturn409()
+        {
+            await using var factory = new CustomApiFactory();
+            using var client = factory.CreateClient();
+            var equipmentId = await CreateEquipmentAsync(client);
+            var createResponse = await PostPlanAsync(
+                client,
+                equipmentId,
+                "2026-11-12",
+                "Annual inspection",
+                "Olena Kovalenko",
+                null);
+            using var createdJson = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+            var planId = createdJson.RootElement.GetProperty("id").GetGuid();
+
+            var firstUpdate = await PatchStatusAsync(client, planId, "Cancelled");
+            Assert.Equal(HttpStatusCode.OK, firstUpdate.StatusCode);
+
+            var secondUpdate = await PatchStatusAsync(client, planId, "Completed");
 
             Assert.Equal(HttpStatusCode.Conflict, secondUpdate.StatusCode);
         }
