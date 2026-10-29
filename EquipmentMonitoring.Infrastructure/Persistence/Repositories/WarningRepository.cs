@@ -1,6 +1,7 @@
 using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
+using EquipmentMonitoring.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
@@ -61,6 +62,22 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
                 .ToListAsync(cancellationToken);
 
             return new PagedList<Warning>(items, totalCount);
+        }
+
+        public async Task<IReadOnlyList<ActiveWarningCount>> CountActiveByEquipmentAndTypeAsync(
+            CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Warnings
+                .Where(w => w.Status == WarningStatus.Active)
+                .GroupBy(w => new { w.EquipmentId, w.Equipment.Name, w.Equipment.SerialNumber, w.MeasurementType })
+                .Select(g => new ActiveWarningCount(
+                    g.Key.EquipmentId,
+                    g.Key.Name,
+                    g.Key.SerialNumber,
+                    g.Key.MeasurementType,
+                    g.Count(),
+                    g.Max(w => w.CreatedAtUtc)))
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -12,6 +12,9 @@ namespace EquipmentMonitoring.Application.Abstractions.Persistence
             WarningSearchCriteria criteria,
             CancellationToken cancellationToken = default);
 
+        Task<IReadOnlyList<ActiveWarningCount>> CountActiveByEquipmentAndTypeAsync(
+            CancellationToken cancellationToken = default);
+
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }

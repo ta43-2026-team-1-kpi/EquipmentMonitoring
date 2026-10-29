@@ -16,6 +16,7 @@ namespace EquipmentMonitoring.Tests.API
             { "/api/equipment/{equipmentId}/thresholds/{measurementType}", "put" },
             { "/api/equipment/{equipmentId}/thresholds/{measurementType}", "delete" },
             { "/api/warnings", "get" },
+            { "/api/warnings/summary", "get" },
             { "/api/warnings/{warningId}", "get" },
             { "/api/warnings/{warningId}/acknowledge", "post" }
         };
@@ -42,6 +43,7 @@ namespace EquipmentMonitoring.Tests.API
         [InlineData("/api/thresholds/{measurementType}", "put", new[] { "200", "201", "400", "409" })]
         [InlineData("/api/equipment/{equipmentId}/thresholds/{measurementType}", "put", new[] { "200", "201", "400", "404", "409" })]
         [InlineData("/api/warnings", "get", new[] { "200", "400", "404" })]
+        [InlineData("/api/warnings/summary", "get", new[] { "200" })]
         [InlineData("/api/warnings/{warningId}/acknowledge", "post", new[] { "200", "404" })]
         public async Task Operation_ShouldDocumentResponsesWithExamples(string path, string method, string[] statusCodes)
         {
@@ -75,6 +77,9 @@ namespace EquipmentMonitoring.Tests.API
         [InlineData("WarningDto", "breachType")]
         [InlineData("WarningDto", "limitValue")]
         [InlineData("WarningDto", "status")]
+        [InlineData("WarningSummaryDto", "totalActive")]
+        [InlineData("EquipmentWarningSummaryDto", "activeCount")]
+        [InlineData("MeasurementTypeWarningCountDto", "count")]
         public async Task Schema_ShouldDescribeMonitoringProperties(string schema, string property)
         {
             using var document = await GetDocumentAsync();

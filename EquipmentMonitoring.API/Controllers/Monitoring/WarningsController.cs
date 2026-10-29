@@ -109,6 +109,15 @@ namespace EquipmentMonitoring.API.Controllers.Monitoring
             }
         }
 
+        [HttpGet("summary")]
+        [EndpointSummary("Зведення активних попереджень")]
+        [EndpointDescription("Кількість активних попереджень загалом і для кожного обладнання з розбивкою за типами показників. Спочатку обладнання з найбільшою кількістю, за рівної кількості — з новішим попередженням. Опрацьовані попередження не враховуються.")]
+        [ProducesResponseType<WarningSummaryDto>(StatusCodes.Status200OK)]
+        public async Task<ActionResult<WarningSummaryDto>> GetSummaryAsync(CancellationToken cancellationToken)
+        {
+            return Ok(await _warningService.GetActiveSummaryAsync(cancellationToken));
+        }
+
         [HttpGet("{warningId:guid}")]
         [EndpointSummary("Попередження за ідентифікатором")]
         [EndpointDescription("Повертає попередження незалежно від його стану.")]

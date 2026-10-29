@@ -127,6 +127,63 @@ namespace EquipmentMonitoring.Tests.Application
                 CreateService(context, NowUtc).SearchAsync(new WarningSearchCriteria(Guid.NewGuid(), null, null, 1, 10)));
         }
 
+        [Fact]
+        public async Task GetActiveSummaryAsync_ShouldGroupByEquipmentWithMostAffectedFirst()
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            var motor = await database.AddEquipmentAsync("SN-WS-MOTOR", "Motor M-2");
+            var pump = await database.AddEquipmentAsync("SN-WS-PUMP", "Pump P-7");
+            await database.AddWarningAsync(motor.Id, MeasurementType.Voltage, NowUtc.AddMinutes(30));
+            await database.AddWarningAsync(pump.Id, MeasurementType.Load, NowUtc);
+            await database.AddWarningAsync(pump.Id, MeasurementType.Temperature, NowUtc.AddMinutes(5));
+            await database.AddWarningAsync(pump.Id, MeasurementType.Temperature, NowUtc.AddMinutes(10));
+            await database.AddWarningAsync(pump.Id, MeasurementType.Load, NowUtc.AddMinutes(15), acknowledged: true);
+            await using var context = database.CreateContext();
+
+            var summary = await CreateService(context, NowUtc).GetActiveSummaryAsync();
+
+            Assert.Equal(4, summary.TotalActive);
+            Assert.Equal([pump.Id, motor.Id], summary.Equipment.Select(e => e.EquipmentId));
+
+            var mostAffected = summary.Equipment[0];
+            Assert.Equal("Pump P-7", mostAffected.EquipmentName);
+            Assert.Equal("SN-WS-PUMP", mostAffected.EquipmentSerialNumber);
+            Assert.Equal(3, mostAffected.ActiveCount);
+            Assert.Equal(NowUtc.AddMinutes(10), mostAffected.LatestCreatedAtUtc.UtcDateTime);
+            Assert.Equal(
+                [(MeasurementType.Temperature, 2), (MeasurementType.Load, 1)],
+                mostAffected.ByMeasurementType.Select(t => (t.MeasurementType, t.Count)));
+        }
+
+        [Fact]
+        public async Task GetActiveSummaryAsync_WithEqualCounts_ShouldPutMostRecentFirst()
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            var older = await database.AddEquipmentAsync("SN-WS-OLD");
+            var newer = await database.AddEquipmentAsync("SN-WS-NEW");
+            await database.AddWarningAsync(older.Id, MeasurementType.Load, NowUtc);
+            await database.AddWarningAsync(newer.Id, MeasurementType.Load, NowUtc.AddMinutes(1));
+            await using var context = database.CreateContext();
+
+            var summary = await CreateService(context, NowUtc).GetActiveSummaryAsync();
+
+            Assert.Equal([newer.Id, older.Id], summary.Equipment.Select(e => e.EquipmentId));
+        }
+
+        [Fact]
+        public async Task GetActiveSummaryAsync_WithoutActiveWarnings_ShouldReturnEmptySummary()
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            var equipment = await database.AddEquipmentAsync("SN-WS-EMPTY");
+            await database.AddWarningAsync(equipment.Id, MeasurementType.Load, NowUtc, acknowledged: true);
+            await using var context = database.CreateContext();
+
+            var summary = await CreateService(context, NowUtc).GetActiveSummaryAsync();
+
+            Assert.Equal(0, summary.TotalActive);
+            Assert.Empty(summary.Equipment);
+        }
+
         private static WarningService CreateService(EquipmentMonitoringDbContext context, DateTime utcNow)
         {
             return new WarningService(

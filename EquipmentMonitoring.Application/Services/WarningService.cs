@@ -46,6 +46,12 @@ namespace EquipmentMonitoring.Application.Services
             };
         }
 
+        public async Task<WarningSummaryDto> GetActiveSummaryAsync(CancellationToken cancellationToken = default)
+        {
+            var counts = await _warningRepository.CountActiveByEquipmentAndTypeAsync(cancellationToken);
+            return counts.ToSummaryDto();
+        }
+
         public async Task<WarningDto?> GetAsync(Guid warningId, CancellationToken cancellationToken = default)
         {
             var warning = await _warningRepository.FindAsync(warningId, cancellationToken);

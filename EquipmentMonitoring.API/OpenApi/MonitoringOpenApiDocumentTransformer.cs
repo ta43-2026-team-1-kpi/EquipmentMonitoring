@@ -16,6 +16,7 @@ namespace EquipmentMonitoring.API.OpenApi
         private const string EquipmentThresholds = "/api/equipment/{equipmentId}/thresholds";
         private const string EffectiveThresholds = "/api/equipment/{equipmentId}/thresholds/effective";
         private const string Warnings = "/api/warnings";
+        private const string WarningSummary = "/api/warnings/summary";
         private const string WarningById = "/api/warnings/{warningId}";
         private const string AcknowledgeWarning = "/api/warnings/{warningId}/acknowledge";
 
@@ -50,6 +51,7 @@ namespace EquipmentMonitoring.API.OpenApi
             new(Warnings, HttpMethod.Get, "200", "Сторінка попереджень.", Examples.WarningPage),
             new(Warnings, HttpMethod.Get, "400", "Некоректні параметри фільтрації або пагінації.", Examples.InvalidWarningQuery),
             new(Warnings, HttpMethod.Get, "404", "Обладнання з фільтра equipmentId не знайдено.", Examples.EquipmentNotFound),
+            new(WarningSummary, HttpMethod.Get, "200", "Зведення (без активних попереджень: totalActive = 0, equipment = []).", Examples.WarningSummary),
             new(WarningById, HttpMethod.Get, "200", "Попередження.", Examples.ActiveWarning),
             new(WarningById, HttpMethod.Get, "404", "Попередження не знайдено.", Examples.WarningNotFound),
             new(AcknowledgeWarning, HttpMethod.Post, "200", "Попередження опрацьовано (або вже було опрацьоване).", Examples.AcknowledgedWarning),
@@ -212,6 +214,35 @@ namespace EquipmentMonitoring.API.OpenApi
                 { "items": [
                 """ + ActiveWarning + """
                 ], "page": 1, "pageSize": 50, "totalCount": 1, "totalPages": 1 }
+                """;
+
+            public const string WarningSummary = """
+                {
+                  "totalActive": 4,
+                  "equipment": [
+                    {
+                      "equipmentId": "8d65a7de-5d4e-4f08-bdc8-ff4cfd8f40b8",
+                      "equipmentName": "Compressor A1",
+                      "equipmentSerialNumber": "SN-2026-0001",
+                      "activeCount": 3,
+                      "latestCreatedAtUtc": "2026-10-25T11:58:01+00:00",
+                      "byMeasurementType": [
+                        { "measurementType": "Temperature", "count": 2 },
+                        { "measurementType": "Load", "count": 1 }
+                      ]
+                    },
+                    {
+                      "equipmentId": "1b2c3d4e-5f60-4a7b-8c9d-0e1f2a3b4c5d",
+                      "equipmentName": "Pump P-7",
+                      "equipmentSerialNumber": "SN-2026-0002",
+                      "activeCount": 1,
+                      "latestCreatedAtUtc": "2026-10-25T11:40:12+00:00",
+                      "byMeasurementType": [
+                        { "measurementType": "Voltage", "count": 1 }
+                      ]
+                    }
+                  ]
+                }
                 """;
 
             public const string InvalidMeasurementType = """
