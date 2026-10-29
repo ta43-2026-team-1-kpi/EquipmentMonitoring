@@ -202,6 +202,12 @@ Accept: application/json
 
 ###
 
+### Зведення активних попереджень за обладнанням
+GET {{EquipmentMonitoring.API_HostAddress}}/api/warnings/summary
+Accept: application/json
+
+###
+
 ### Попередження обладнання за типом, усі стани, друга сторінка
 GET {{EquipmentMonitoring.API_HostAddress}}/api/warnings?equipmentId={{EquipmentId}}&measurementType=Temperature&status=All&page=2&pageSize=20
 Accept: application/json

@@ -137,6 +137,7 @@ dotnet dev-certs https --trust
 - `PUT /api/equipment/{equipmentId}/thresholds/{measurementType}`
 - `DELETE /api/equipment/{equipmentId}/thresholds/{measurementType}`
 - `GET /api/warnings`
+- `GET /api/warnings/summary` — зведення активних попереджень за обладнанням
 - `GET /api/warnings/{warningId}`
 - `POST /api/warnings/{warningId}/acknowledge`
 
@@ -156,6 +157,7 @@ dotnet dev-certs https --trust
    1) Задайте межу (`PUT /api/thresholds/{measurementType}` або `PUT /api/equipment/{equipmentId}/thresholds/{measurementType}`).
    2) Додайте вимірювання поза межами.
    3) Перегляньте попередження через `GET /api/warnings`.
+   4) Подивіться, яке обладнання потребує уваги, через `GET /api/warnings/summary`.
 
 3. **Створення плану → зміна стану**
    1) Створіть план через `POST /api/maintenance-plans`.
