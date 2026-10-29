@@ -1,3 +1,4 @@
+using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.DTOs.Threshold;
 using EquipmentMonitoring.Application.DTOs.Warning;
 using EquipmentMonitoring.Domain.Entities;
@@ -44,6 +45,35 @@ namespace EquipmentMonitoring.Application.Mapping
                 CreatedAtUtc = AsUtcOffset(warning.CreatedAtUtc),
                 Status = warning.Status,
                 AcknowledgedAtUtc = warning.AcknowledgedAtUtc is null ? null : AsUtcOffset(warning.AcknowledgedAtUtc.Value)
+            };
+        }
+
+        public static WarningSummaryDto ToSummaryDto(this IEnumerable<ActiveWarningCount> counts)
+        {
+            var equipment = counts
+                .GroupBy(c => c.EquipmentId)
+                .Select(g => new EquipmentWarningSummaryDto
+                {
+                    EquipmentId = g.Key,
+                    EquipmentName = g.First().EquipmentName,
+                    EquipmentSerialNumber = g.First().EquipmentSerialNumber,
+                    ActiveCount = g.Sum(c => c.Count),
+                    LatestCreatedAtUtc = AsUtcOffset(g.Max(c => c.LatestCreatedAtUtc)),
+                    ByMeasurementType = g
+                        .OrderByDescending(c => c.Count)
+                        .ThenBy(c => c.MeasurementType)
+                        .Select(c => new MeasurementTypeWarningCountDto { MeasurementType = c.MeasurementType, Count = c.Count })
+                        .ToList()
+                })
+                .OrderByDescending(e => e.ActiveCount)
+                .ThenByDescending(e => e.LatestCreatedAtUtc)
+                .ThenBy(e => e.EquipmentId)
+                .ToList();
+
+            return new WarningSummaryDto
+            {
+                TotalActive = equipment.Sum(e => e.ActiveCount),
+                Equipment = equipment
             };
         }
 
