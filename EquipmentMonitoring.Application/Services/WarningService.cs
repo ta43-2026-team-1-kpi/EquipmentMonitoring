@@ -46,6 +46,11 @@ namespace EquipmentMonitoring.Application.Services
             };
         }
 
+        public Task<WarningSummaryDto> GetActiveSummaryAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<WarningDto?> GetAsync(Guid warningId, CancellationToken cancellationToken = default)
         {
             var warning = await _warningRepository.FindAsync(warningId, cancellationToken);

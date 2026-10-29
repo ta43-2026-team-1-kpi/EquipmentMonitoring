@@ -193,6 +193,49 @@ namespace EquipmentMonitoring.Tests.Infrastructure
             Assert.Contains("CHECK constraint failed", exception.Message);
         }
 
+        [Fact]
+        public async Task CountActiveByEquipmentAndTypeAsync_ShouldGroupByEquipmentAndMeasurementType()
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            var pump = await database.AddEquipmentAsync("SN-WR-PUMP", "Pump P-7");
+            var motor = await database.AddEquipmentAsync("SN-WR-MOTOR", "Motor M-2");
+            await database.AddWarningAsync(pump.Id, MeasurementType.Temperature, NowUtc);
+            await database.AddWarningAsync(pump.Id, MeasurementType.Temperature, NowUtc.AddMinutes(10));
+            await database.AddWarningAsync(pump.Id, MeasurementType.Load, NowUtc.AddMinutes(5));
+            await database.AddWarningAsync(motor.Id, MeasurementType.Voltage, NowUtc.AddMinutes(1));
+
+            await using var context = database.CreateContext();
+            var counts = await new WarningRepository(context).CountActiveByEquipmentAndTypeAsync();
+
+            Assert.Equal(3, counts.Count);
+            var pumpTemperature = Assert.Single(counts, c => c.EquipmentId == pump.Id && c.MeasurementType == MeasurementType.Temperature);
+            Assert.Equal(2, pumpTemperature.Count);
+            Assert.Equal(NowUtc.AddMinutes(10), pumpTemperature.LatestCreatedAtUtc);
+            Assert.Equal("Pump P-7", pumpTemperature.EquipmentName);
+            Assert.Equal("SN-WR-PUMP", pumpTemperature.EquipmentSerialNumber);
+            Assert.Equal(1, Assert.Single(counts, c => c.EquipmentId == pump.Id && c.MeasurementType == MeasurementType.Load).Count);
+            Assert.Equal(1, Assert.Single(counts, c => c.EquipmentId == motor.Id).Count);
+        }
+
+        [Fact]
+        public async Task CountActiveByEquipmentAndTypeAsync_ShouldIgnoreAcknowledgedWarnings()
+        {
+            await using var database = await SqliteTestDatabase.CreateAsync();
+            var equipment = await database.AddEquipmentAsync("SN-WR-ACK");
+            await database.AddWarningAsync(equipment.Id, MeasurementType.Load, NowUtc);
+            await database.AddWarningAsync(equipment.Id, MeasurementType.Load, NowUtc.AddMinutes(10), acknowledged: true);
+            var onlyAcknowledged = await database.AddEquipmentAsync("SN-WR-ACK-2");
+            await database.AddWarningAsync(onlyAcknowledged.Id, MeasurementType.Voltage, NowUtc, acknowledged: true);
+
+            await using var context = database.CreateContext();
+            var counts = await new WarningRepository(context).CountActiveByEquipmentAndTypeAsync();
+
+            var count = Assert.Single(counts);
+            Assert.Equal(equipment.Id, count.EquipmentId);
+            Assert.Equal(1, count.Count);
+            Assert.Equal(NowUtc, count.LatestCreatedAtUtc);
+        }
+
         private static async Task<(Equipment Equipment, List<Warning> Warnings)> SeedAsync(
             SqliteTestDatabase database,
             int count,

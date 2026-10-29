@@ -58,6 +58,28 @@ namespace EquipmentMonitoring.Tests.Infrastructure
             return measurement;
         }
 
+        public async Task<Warning> AddWarningAsync(
+            Guid equipmentId,
+            MeasurementType type,
+            DateTime createdAtUtc,
+            bool acknowledged = false)
+        {
+            var measurement = await AddMeasurementAsync(equipmentId, type, 60, createdAtUtc);
+            var threshold = Threshold.CreateGlobal(type, null, 50, createdAtUtc);
+            var warning = Warning.FromBreach(measurement, threshold, threshold.Evaluate(measurement.Value)!, createdAtUtc);
+
+            if (acknowledged)
+            {
+                warning.Acknowledge(createdAtUtc.AddMinutes(1));
+            }
+
+            await using var context = CreateContext();
+            context.Warnings.Add(warning);
+            await context.SaveChangesAsync();
+
+            return warning;
+        }
+
         public ValueTask DisposeAsync()
         {
             return _connection.DisposeAsync();

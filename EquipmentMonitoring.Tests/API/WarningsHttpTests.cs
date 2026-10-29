@@ -206,6 +206,50 @@ namespace EquipmentMonitoring.Tests.API
         }
 
         [Fact]
+        public async Task GetSummary_ShouldCountActiveWarningsPerEquipment()
+        {
+            await using var factory = await MonitoringApiFactory.CreateAsync();
+            using var client = factory.CreateClient();
+            var pump = await client.CreateEquipmentAsync("SN-WH-SUM-1", "Pump P-7");
+            var motor = await client.CreateEquipmentAsync("SN-WH-SUM-2", "Motor M-2");
+            await client.PutGlobalThresholdAsync(MeasurementType.Temperature, null, 80);
+            await client.PostMeasurementAsync(pump, MeasurementType.Temperature, 91, MeasuredAtUtc);
+            await client.PostMeasurementAsync(pump, MeasurementType.Temperature, 95, MeasuredAtUtc.AddMinutes(1));
+            await client.PostMeasurementAsync(motor, MeasurementType.Temperature, 85, MeasuredAtUtc);
+            await client.PostMeasurementAsync(motor, MeasurementType.Temperature, 70, MeasuredAtUtc.AddMinutes(1));
+
+            var motorWarnings = await (await client.GetAsync($"/api/warnings?equipmentId={motor}")).ReadAsAsync<PagedResultDto<WarningDto>>();
+            await client.PostAsync($"/api/warnings/{Assert.Single(motorWarnings.Items).Id}/acknowledge", null);
+
+            var response = await client.GetAsync("/api/warnings/summary");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var summary = await response.ReadAsAsync<WarningSummaryDto>();
+            Assert.Equal(2, summary.TotalActive);
+            var equipment = Assert.Single(summary.Equipment);
+            Assert.Equal(pump, equipment.EquipmentId);
+            Assert.Equal("Pump P-7", equipment.EquipmentName);
+            Assert.Equal(2, equipment.ActiveCount);
+            var byType = Assert.Single(equipment.ByMeasurementType);
+            Assert.Equal(MeasurementType.Temperature, byType.MeasurementType);
+            Assert.Equal(2, byType.Count);
+        }
+
+        [Fact]
+        public async Task GetSummary_WithoutWarnings_ShouldReturnEmptySummary()
+        {
+            await using var factory = await MonitoringApiFactory.CreateAsync();
+            using var client = factory.CreateClient();
+
+            var response = await client.GetAsync("/api/warnings/summary");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var summary = await response.ReadAsAsync<WarningSummaryDto>();
+            Assert.Equal(0, summary.TotalActive);
+            Assert.Empty(summary.Equipment);
+        }
+
+        [Fact]
         public async Task Acknowledge_UnknownWarning_ShouldReturn404()
         {
             await using var factory = await MonitoringApiFactory.CreateAsync();

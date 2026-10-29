@@ -63,6 +63,12 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
             return new PagedList<Warning>(items, totalCount);
         }
 
+        public Task<IReadOnlyList<ActiveWarningCount>> CountActiveByEquipmentAndTypeAsync(
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             try

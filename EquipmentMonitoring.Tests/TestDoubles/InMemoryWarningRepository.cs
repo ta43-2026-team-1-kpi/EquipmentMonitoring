@@ -25,6 +25,11 @@ namespace EquipmentMonitoring.Tests.TestDoubles
             throw new NotSupportedException();
         }
 
+        public Task<IReadOnlyList<ActiveWarningCount>> CountActiveByEquipmentAndTypeAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             SaveChangesCallsCount++;
