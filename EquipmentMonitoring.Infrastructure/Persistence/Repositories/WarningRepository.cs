@@ -67,22 +67,17 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
         public async Task<IReadOnlyList<ActiveWarningCount>> CountActiveByEquipmentAndTypeAsync(
             CancellationToken cancellationToken = default)
         {
-            var activeWarnings = await _dbContext.Warnings
-                .AsNoTracking()
-                .Include(w => w.Equipment)
+            return await _dbContext.Warnings
                 .Where(w => w.Status == WarningStatus.Active)
-                .ToListAsync(cancellationToken);
-
-            return activeWarnings
-                .GroupBy(w => new { w.EquipmentId, w.MeasurementType })
+                .GroupBy(w => new { w.EquipmentId, w.Equipment.Name, w.Equipment.SerialNumber, w.MeasurementType })
                 .Select(g => new ActiveWarningCount(
                     g.Key.EquipmentId,
-                    g.First().Equipment.Name,
-                    g.First().Equipment.SerialNumber,
+                    g.Key.Name,
+                    g.Key.SerialNumber,
                     g.Key.MeasurementType,
                     g.Count(),
                     g.Max(w => w.CreatedAtUtc)))
-                .ToList();
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
