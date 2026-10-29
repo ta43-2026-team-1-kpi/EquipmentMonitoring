@@ -44,6 +44,32 @@ namespace EquipmentMonitoring.Tests.API
         }
 
         [Fact]
+        public async Task Post_WithSerialNumberOuterSpaces_ShouldReturn201AndPersistNormalizedSerialNumber()
+        {
+            var repository = new FakeEquipmentRepository
+            {
+                ExistsBySerialNumberResult = false,
+                SaveChangesResult = 1
+            };
+            var controller = CreateController(repository);
+
+            var dto = CreateValidDto();
+            dto.SerialNumber = "  SN-TDD-001  ";
+
+            var result = await controller.CreateAsync(dto, CancellationToken.None);
+
+            var objectResult = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status201Created, objectResult.StatusCode);
+
+            var responseDto = Assert.IsType<EquipmentDto>(objectResult.Value);
+            Assert.Equal("SN-TDD-001", responseDto.SerialNumber);
+
+            Assert.Equal("SN-TDD-001", repository.LastExistsBySerialNumberArgument);
+            Assert.NotNull(repository.LastAddedEquipment);
+            Assert.Equal("SN-TDD-001", repository.LastAddedEquipment!.SerialNumber);
+        }
+
+        [Fact]
         public async Task Post_WithInvalidRequiredFields_ShouldReturn400AndNotPersist()
         {
             var repository = new FakeEquipmentRepository();
@@ -98,6 +124,32 @@ namespace EquipmentMonitoring.Tests.API
             Assert.Equal(0, repository.SaveChangesCallsCount);
             Assert.Equal(1, repository.ExistsBySerialNumberCallsCount);
             Assert.Equal(dto.SerialNumber, repository.LastExistsBySerialNumberArgument);
+        }
+
+        [Fact]
+        public async Task Post_WhenNormalizedSerialAlreadyExists_ShouldReturn400AndNotPersist()
+        {
+            var repository = new FakeEquipmentRepository
+            {
+                ExistsBySerialNumberResult = true
+            };
+            var controller = CreateController(repository);
+
+            var dto = CreateValidDto();
+            dto.SerialNumber = "  SN-TDD-001  ";
+
+            var result = await controller.CreateAsync(dto, CancellationToken.None);
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+            var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+            Assert.Contains(nameof(CreateEquipmentDto.SerialNumber), problem.Errors.Keys);
+
+            Assert.Equal(0, repository.AddCallsCount);
+            Assert.Equal(0, repository.SaveChangesCallsCount);
+            Assert.Equal(1, repository.ExistsBySerialNumberCallsCount);
+            Assert.Equal("SN-TDD-001", repository.LastExistsBySerialNumberArgument);
         }
 
         [Fact]

@@ -28,6 +28,45 @@ namespace EquipmentMonitoring.Tests.Application
         }
 
         [Fact]
+        public async Task ValidateAsync_WhenSerialNumberContainsOuterSpaces_ShouldPassNormalizedSerialToExistsCheck()
+        {
+            var dto = CreateValidDto();
+            dto.SerialNumber = "  SN-TDD-001  ";
+
+            var fakeRepository = new FakeEquipmentRepository
+            {
+                ExistsBySerialNumberResult = false
+            };
+            var validator = new EquipmentRegistrationValidator(new CreateEquipmentValidator(), fakeRepository);
+
+            var result = await validator.ValidateAsync(dto);
+
+            Assert.True(result.IsValid);
+            Assert.Equal(1, fakeRepository.ExistsBySerialNumberCallsCount);
+            Assert.Equal("SN-TDD-001", fakeRepository.LastRequestedSerialNumber);
+        }
+
+        [Fact]
+        public async Task ValidateAsync_WhenNormalizedSerialAlreadyExists_ShouldReturnSerialNumberError()
+        {
+            var dto = CreateValidDto();
+            dto.SerialNumber = "  SN-TDD-001  ";
+
+            var fakeRepository = new FakeEquipmentRepository
+            {
+                ExistsBySerialNumberResult = true
+            };
+            var validator = new EquipmentRegistrationValidator(new CreateEquipmentValidator(), fakeRepository);
+
+            var result = await validator.ValidateAsync(dto);
+
+            Assert.False(result.IsValid);
+            Assert.True(result.Errors.ContainsKey(nameof(CreateEquipmentDto.SerialNumber)));
+            Assert.Contains("Обладнання з таким серійним номером уже існує.", result.Errors[nameof(CreateEquipmentDto.SerialNumber)]);
+            Assert.Equal("SN-TDD-001", fakeRepository.LastRequestedSerialNumber);
+        }
+
+        [Fact]
         public async Task ValidateAsync_WhenSerialNumberIsAvailable_ShouldReturnValidResult()
         {
             var dto = CreateValidDto();

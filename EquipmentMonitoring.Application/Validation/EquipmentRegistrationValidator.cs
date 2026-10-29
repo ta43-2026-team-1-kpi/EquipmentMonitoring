@@ -20,6 +20,8 @@ namespace EquipmentMonitoring.Application.Validation
             CreateEquipmentDto dto,
             CancellationToken cancellationToken = default)
         {
+            dto.SerialNumber = dto.SerialNumber?.Trim();
+
             var result = _createEquipmentValidator.Validate(dto);
 
             if (!result.IsValid)
