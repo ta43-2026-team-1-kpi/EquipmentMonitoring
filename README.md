@@ -37,12 +37,20 @@
 
 ## ЛР3: запуск через Docker Compose (API + PostgreSQL + pgAdmin)
 
+### 0) Клонування та вибір гілки ЛР3
+
+```powershell
+git clone https://github.com/ta43-2026-team-1-kpi/EquipmentMonitoring
+Set-Location .\EquipmentMonitoring
+git checkout feature/lab3-docker-postgresql
+```
+
 ### 1) Підготовка `.env`
 
-1. Створіть локальний файл:
+1. Створіть локальний файл (PowerShell):
 
-```bash
-cp .env.example .env
+```powershell
+Copy-Item .env.example .env
 ```
 
 2. Заповніть параметри:
@@ -56,48 +64,59 @@ cp .env.example .env
 
 Для pgAdmin використовуйте валідний email, наприклад `admin@example.com`.
 
+Важливо: `PGADMIN_DEFAULT_PASSWORD` (вхід у веб-інтерфейс pgAdmin) та `POSTGRES_PASSWORD` (пароль користувача PostgreSQL) — це різні облікові дані, задавайте їх окремо.
+
 ### 2) Запуск однією командою
 
-```bash
+```powershell
 docker compose up -d --build
 ```
 
 Перевірка стану:
 
-```bash
+```powershell
 docker compose ps
 ```
 
-### 3) Адреси сервісів
+### 3) Адреси сервісів і порти
 
-- Swagger UI: `http://localhost:8080/swagger/index.html`
-- OpenAPI JSON: `http://localhost:8080/openapi/v1.json`
-- pgAdmin: `http://localhost:5050`
+- Swagger UI: `http://localhost:<API_PORT>/swagger/index.html`
+- OpenAPI JSON: `http://localhost:<API_PORT>/openapi/v1.json`
+- pgAdmin: `http://localhost:<PGADMIN_PORT>`
+
+Якщо порт зайнятий, змініть `API_PORT` або `PGADMIN_PORT` у `.env` і перезапустіть сервіси (`docker compose up -d`).
 
 ### 4) Підключення pgAdmin до PostgreSQL
 
 У pgAdmin (Create Server):
-- Host: `db`
-- Port: `5432`
-- Database: значення `POSTGRES_DB` із локального `.env`
-- Username: значення `POSTGRES_USER` із локального `.env`
-- Password: значення `POSTGRES_PASSWORD` із локального `.env`
+- **General → Name**: будь-яка локальна назва (наприклад `EquipmentMonitoring DB`)
+- **Connection → Host name/address**: `db`
+- **Connection → Port**: `5432`
+- **Connection → Maintenance database**: значення `POSTGRES_DB` із локального `.env`
+- **Connection → Username**: значення `POSTGRES_USER` із локального `.env`
+- **Connection → Password**: значення `POSTGRES_PASSWORD` із локального `.env`
 
 ### 5) Міграції PostgreSQL
 
 У контейнерному режимі API застосовує PostgreSQL-міграції на старті (`Database:ApplyMigrationsOnStartup=true`).
 Помилка міграції зупиняє запуск API.
 
+Під час запуску через Compose локальний .NET SDK не потрібен: API збирається у Docker image.
+
+Для локального `dotnet build` / `dotnet test` SDK потрібен.
+
 ### 6) Build і тести
 
-```bash
+```powershell
 dotnet build
 dotnet test
 ```
 
+Для запуску API поза Docker задайте PostgreSQL-рядок підключення через змінну середовища `ConnectionStrings__EquipmentDatabase`.
+
 ### 7) Керування сервісами
 
-```bash
+```powershell
 docker compose stop
 docker compose start
 docker compose restart
@@ -110,6 +129,20 @@ docker compose down
 
 - PostgreSQL: named volume `postgres_data`
 - pgAdmin: named volume `pgadmin_data`
+
+Демодані, їхні GUID/ID і локальний state-файл перевірок не передаються через Git.
+
+### 9) Порядок перевірочних скриптів ЛР3
+
+Запускати по черзі:
+
+```powershell
+.\scripts\lab3-functional-check.ps1
+.\scripts\lab3-persistence-check.ps1
+.\scripts\lab3-postgres-check.ps1
+```
+
+Другий і третій скрипт залежать від state-файла `%TEMP%\equipmentmonitoring-lab3-state.json`, який створює `lab3-functional-check.ps1`.
 
 ## Endpoint-и
 

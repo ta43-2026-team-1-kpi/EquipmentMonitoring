@@ -32,7 +32,7 @@ services:
       Swagger__Enabled: "true"
       Http__UseHttpsRedirection: "false"
       Database__ApplyMigrationsOnStartup: "true"
-      ConnectionStrings__EquipmentDatabase: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Include Error Detail=true
+      ConnectionStrings__EquipmentDatabase: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
     ports:
       - "127.0.0.1:${API_PORT}:8080"
     networks:

@@ -50,26 +50,26 @@ curl -s -o NUL -w "pgadmin:%{http_code}" http://localhost:5050/
 
 Фактичні статуси:
 - Create equipment: `201`
-- Serial trim rule: вхід `"  SN-LAB3-787F422E  "`, збережено/повернуто `"SN-LAB3-787F422E"`
+- Serial trim rule: вхід `"  SN-LAB3-D0666441  "`, збережено/повернуто `"SN-LAB3-D0666441"`
 - Duplicate serial: `400`
 - List equipment: `200`
-- Filter by status: `200`
+- Filter by status: `200` (усі записи у відповіді мають `Working`)
 - Upsert global temperature threshold `0..80`: `200`
 - Post measurement `50°C`: `201`
 - Post measurement `90°C`: `201`
 - History with filters: `200` (2 записи)
 - Warnings list: `200`
 - Warnings summary: `200`
-- Acknowledge warning: `200`
+- Acknowledge warning: `200` (`Acknowledged`)
 - Create maintenance plan: `201`
-- Update maintenance plan status: `200` (`Completed`)
+- Update maintenance plan status: `200` (`Planned` -> `Completed`)
 
 Демо-ID:
-- EquipmentId: `c66a8aab-0d8e-4a3b-9b32-a364e3d504a4`
-- Measurement1Id: `dacfcd0f-9cba-43aa-aac7-07dbe6d48e7a`
-- Measurement2Id: `6067fb22-2b83-436b-b947-0bcd2c104c66`
-- WarningId: `da80553a-8ac2-4f6d-a008-5e7f9e839ba3`
-- MaintenancePlanId: `2cda8dc6-d7b4-4a46-a9da-ac1797f60f68`
+- EquipmentId: `2473a102-dc58-4638-86cc-a66b0d306a63`
+- Measurement1Id: `f7f33a78-6f0b-4b7f-a4cf-fbe4e97890f3`
+- Measurement2Id: `5d9eae2a-bc59-4b4f-af9d-feb68ac7b323`
+- WarningId: `76f65b13-e237-4ddf-ba41-8816ad5be9fc`
+- MaintenancePlanId: `6c5696fb-b9e7-4ae3-b290-d3056f0f50c6`
 
 ### 4) Пряма SQL-перевірка в PostgreSQL
 
@@ -77,9 +77,11 @@ curl -s -o NUL -w "pgadmin:%{http_code}" http://localhost:5050/
 
 Факт:
 - запис обладнання знайдено з тим самим `Id` і `SerialNumber`;
-- обидва вимірювання знайдено з тими самими `Id`;
-- warning знайдено, статус `Acknowledged`;
+- обидва вимірювання знайдено з тими самими `Id` і очікуваними значеннями (`50`, `90`);
+- warning знайдено за зв'язкою (`WarningId` + `EquipmentId` + `MeasurementId`), статус `Acknowledged`, `AcknowledgedAtUtc` не `NULL`;
 - maintenance plan знайдено, статус `Completed`.
+
+Примітка: перший запуск SQL-скрипта впав через синтаксис `DO $$` після інтерполяції PowerShell; після виправлення delimiter-ів перевірка завершилась `lab3-postgres-check: OK`.
 
 ### 5) Перевірка збереження тих самих записів
 
@@ -102,6 +104,8 @@ dotnet test
 Фінальний результат:
 - Build: успішно
 - Tests: `325 passed, 0 failed, 0 skipped`
+
+Додатково: після змін у `Program.cs`/`appsettings.json` тестові фабрики отримали явний тестовий `ConnectionStrings:EquipmentDatabase` (in-memory config + host setting), без використання реальних секретів.
 
 ## 10 початкових падінь MaintenancePlans: причина та виправлення
 

@@ -1,4 +1,4 @@
-@EquipmentMonitoring.API_HostAddress = https://localhost:7114
+@EquipmentMonitoring.API_HostAddress = http://localhost:8080
 @EquipmentId = 00000000-0000-0000-0000-000000000000
 @MaintenancePlanId = 00000000-0000-0000-0000-000000000000
 
@@ -91,6 +91,7 @@ Accept: application/json
 ###
 
 ### Створити план технічного обслуговування для зареєстрованого обладнання
+### plannedDate має бути актуальною або майбутньою датою
 POST {{EquipmentMonitoring.API_HostAddress}}/api/maintenance-plans
 Content-Type: application/json
 Accept: application/json
