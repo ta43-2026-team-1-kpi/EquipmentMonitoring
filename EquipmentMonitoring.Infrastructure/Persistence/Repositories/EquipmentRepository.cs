@@ -2,14 +2,13 @@ using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 {
     public class EquipmentRepository : IEquipmentRepository
     {
-        private const int SqliteConstraintUniqueExtendedErrorCode = 2067;
+        private const string EquipmentSerialNumberUniqueIndexName = "IX_Equipment_SerialNumber";
 
         private readonly EquipmentMonitoringDbContext _dbContext;
 
@@ -84,23 +83,13 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
         private static bool IsDuplicateSerialNumberViolation(
             DbUpdateException exception)
         {
-            if (exception.InnerException is not SqliteException sqliteException)
+            if (SqliteErrors.IsPostgresConstraint(exception, EquipmentSerialNumberUniqueIndexName))
             {
-                return false;
+                return true;
             }
 
-            if (sqliteException.SqliteExtendedErrorCode
-                != SqliteConstraintUniqueExtendedErrorCode)
-            {
-                return false;
-            }
-
-            return sqliteException.Message.Contains(
-                    "Equipment.SerialNumber",
-                    StringComparison.Ordinal)
-                || sqliteException.Message.Contains(
-                    "IX_Equipment_SerialNumber",
-                    StringComparison.Ordinal);
+            return SqliteErrors.IsUniqueViolation(exception)
+                && exception.InnerException?.Message.Contains("SerialNumber", StringComparison.OrdinalIgnoreCase) == true;
         }
     }
 }

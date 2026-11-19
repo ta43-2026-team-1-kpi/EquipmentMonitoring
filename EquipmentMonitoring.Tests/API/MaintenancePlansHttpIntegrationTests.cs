@@ -18,11 +18,12 @@ namespace EquipmentMonitoring.Tests.API
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
+            var plannedDate = GetFutureDate(7);
 
             var response = await PostPlanAsync(
                 client,
                 equipmentId,
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 "Check the safety valves");
@@ -32,7 +33,7 @@ namespace EquipmentMonitoring.Tests.API
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             var plan = json.RootElement;
             Assert.Equal(equipmentId, plan.GetProperty("equipmentId").GetGuid());
-            Assert.Equal("2026-11-12", plan.GetProperty("plannedDate").GetString());
+            Assert.Equal(plannedDate, plan.GetProperty("plannedDate").GetString());
             Assert.Equal("Annual inspection", plan.GetProperty("workType").GetString());
             Assert.Equal("Olena Kovalenko", plan.GetProperty("responsibleEmployee").GetString());
             Assert.Equal("Check the safety valves", plan.GetProperty("note").GetString());
@@ -44,11 +45,12 @@ namespace EquipmentMonitoring.Tests.API
         {
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
+            var plannedDate = GetFutureDate(7);
 
             var response = await PostPlanAsync(
                 client,
                 Guid.NewGuid(),
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 null);
@@ -63,18 +65,22 @@ namespace EquipmentMonitoring.Tests.API
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
 
-            await PostPlanAsync(client, equipmentId, "2026-12-01", "Later work", "Employee A", null);
-            await PostPlanAsync(client, equipmentId, "2026-11-05", "Earlier work", "Employee B", null);
-            await PostPlanAsync(client, equipmentId, "2026-11-20", "Middle work", "Employee C", null);
+            var dateEarly = GetFutureDate(4);
+            var dateMiddle = GetFutureDate(20);
+            var dateLate = GetFutureDate(30);
+
+            await PostPlanAsync(client, equipmentId, dateLate, "Later work", "Employee A", null);
+            await PostPlanAsync(client, equipmentId, dateEarly, "Earlier work", "Employee B", null);
+            await PostPlanAsync(client, equipmentId, dateMiddle, "Middle work", "Employee C", null);
 
             var response = await client.GetAsync("/api/maintenance-plans");
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             Assert.Equal(3, json.RootElement.GetArrayLength());
-            Assert.Equal("2026-11-05", json.RootElement[0].GetProperty("plannedDate").GetString());
-            Assert.Equal("2026-11-20", json.RootElement[1].GetProperty("plannedDate").GetString());
-            Assert.Equal("2026-12-01", json.RootElement[2].GetProperty("plannedDate").GetString());
+            Assert.Equal(dateEarly, json.RootElement[0].GetProperty("plannedDate").GetString());
+            Assert.Equal(dateMiddle, json.RootElement[1].GetProperty("plannedDate").GetString());
+            Assert.Equal(dateLate, json.RootElement[2].GetProperty("plannedDate").GetString());
         }
 
         [Fact]
@@ -85,8 +91,11 @@ namespace EquipmentMonitoring.Tests.API
             var requestedEquipmentId = await CreateEquipmentAsync(client);
             var otherEquipmentId = await CreateEquipmentAsync(client);
 
-            await PostPlanAsync(client, requestedEquipmentId, "2026-11-05", "Requested equipment", "Employee A", null);
-            await PostPlanAsync(client, otherEquipmentId, "2026-11-06", "Other equipment", "Employee B", null);
+            var dateRequested = GetFutureDate(5);
+            var dateOther = GetFutureDate(6);
+
+            await PostPlanAsync(client, requestedEquipmentId, dateRequested, "Requested equipment", "Employee A", null);
+            await PostPlanAsync(client, otherEquipmentId, dateOther, "Other equipment", "Employee B", null);
 
             var response = await client.GetAsync(
                 $"/api/maintenance-plans?equipmentId={requestedEquipmentId}");
@@ -107,10 +116,11 @@ namespace EquipmentMonitoring.Tests.API
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
+            var plannedDate = GetFutureDate(7);
             var createResponse = await PostPlanAsync(
                 client,
                 equipmentId,
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 null);
@@ -130,10 +140,11 @@ namespace EquipmentMonitoring.Tests.API
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
+            var plannedDate = GetFutureDate(7);
             var createResponse = await PostPlanAsync(
                 client,
                 equipmentId,
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 null);
@@ -180,10 +191,11 @@ namespace EquipmentMonitoring.Tests.API
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
+            var plannedDate = GetFutureDate(7);
             var createResponse = await PostPlanAsync(
                 client,
                 equipmentId,
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 null);
@@ -204,10 +216,11 @@ namespace EquipmentMonitoring.Tests.API
             await using var factory = new CustomApiFactory();
             using var client = factory.CreateClient();
             var equipmentId = await CreateEquipmentAsync(client);
+            var plannedDate = GetFutureDate(7);
             var createResponse = await PostPlanAsync(
                 client,
                 equipmentId,
-                "2026-11-12",
+                plannedDate,
                 "Annual inspection",
                 "Olena Kovalenko",
                 null);
@@ -288,6 +301,11 @@ namespace EquipmentMonitoring.Tests.API
             return client.PostAsync(
                 "/api/maintenance-plans",
                 new StringContent(body, Encoding.UTF8, "application/json"));
+        }
+
+        private static string GetFutureDate(int daysFromToday)
+        {
+            return DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysFromToday)).ToString("yyyy-MM-dd");
         }
 
         private static Task<HttpResponseMessage> PatchStatusAsync(
