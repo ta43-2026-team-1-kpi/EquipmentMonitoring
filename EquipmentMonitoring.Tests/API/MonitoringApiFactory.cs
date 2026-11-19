@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -50,6 +51,15 @@ namespace EquipmentMonitoring.Tests.API
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting("ConnectionStrings:EquipmentDatabase", "Host=localhost;Port=5432;Database=test_db;Username=test_user;Password=test_password");
+            builder.ConfigureAppConfiguration((_, configBuilder) =>
+            {
+                configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:EquipmentDatabase"] = "Host=localhost;Port=5432;Database=test_db;Username=test_user;Password=test_password"
+                });
+            });
+
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<DbContextOptions<EquipmentMonitoringDbContext>>();

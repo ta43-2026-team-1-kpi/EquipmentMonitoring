@@ -6,31 +6,21 @@ using EquipmentMonitoring.Application.Services;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Infrastructure.Persistence;
 using EquipmentMonitoring.Infrastructure.Persistence.Repositories;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("EquipmentDatabase")
-    ?? throw new InvalidOperationException("Connection string 'EquipmentDatabase' is not configured.");
+    ?? throw new InvalidOperationException(
+        "Connection string 'EquipmentDatabase' is not configured. " +
+        "For Docker Compose run, use .env and docker-compose.yaml. " +
+        "For local non-Docker run, set ConnectionStrings__EquipmentDatabase to a PostgreSQL connection string.");
 
-var sqliteConnectionStringBuilder = new SqliteConnectionStringBuilder(connectionString);
-
-if (!string.IsNullOrWhiteSpace(sqliteConnectionStringBuilder.DataSource)
-    && !Path.IsPathRooted(sqliteConnectionStringBuilder.DataSource)
-    && sqliteConnectionStringBuilder.DataSource != ":memory:")
-{
-    sqliteConnectionStringBuilder.DataSource = Path.GetFullPath(
-        sqliteConnectionStringBuilder.DataSource,
-        builder.Environment.ContentRootPath);
-}
-
-var resolvedConnectionString = sqliteConnectionStringBuilder.ToString();
-
-// Add services to the container.
-builder.Services.AddDbContext<EquipmentMonitoringDbContext>(options =>
-    options.UseSqlite(resolvedConnectionString));
+builder.Services.AddDbContext<EquipmentMonitoringDbContext, PostgresEquipmentMonitoringDbContext>(options =>
+    options.UseNpgsql(
+        connectionString,
+        npgsql => npgsql.MigrationsAssembly("EquipmentMonitoring.Infrastructure")));
 builder.Services.AddScoped<IEquipmentRepository, EquipmentRepository>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<IMaintenancePlanRepository, MaintenancePlanRepository>();
@@ -65,8 +55,15 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
+if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<EquipmentMonitoringDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment()))
 {
     app.MapOpenApi();
     app.UseSwaggerUI(options =>
@@ -76,7 +73,10 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+if (app.Configuration.GetValue("Http:UseHttpsRedirection", true))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 

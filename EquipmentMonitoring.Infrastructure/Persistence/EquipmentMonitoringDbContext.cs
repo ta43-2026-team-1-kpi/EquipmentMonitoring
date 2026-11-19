@@ -6,7 +6,7 @@ namespace EquipmentMonitoring.Infrastructure.Persistence
 {
     public class EquipmentMonitoringDbContext : DbContext
     {
-        public EquipmentMonitoringDbContext(DbContextOptions<EquipmentMonitoringDbContext> options)
+        public EquipmentMonitoringDbContext(DbContextOptions options)
             : base(options)
         {
         }

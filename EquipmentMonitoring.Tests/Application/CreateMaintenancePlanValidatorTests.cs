@@ -81,7 +81,7 @@ namespace EquipmentMonitoring.Tests.Application
             return new CreateMaintenancePlanDto
             {
                 EquipmentId = Guid.NewGuid(),
-                PlannedDate = new DateOnly(2026, 11, 12),
+                PlannedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)),
                 WorkType = "Annual inspection",
                 ResponsibleEmployee = "Olena Kovalenko",
                 Note = "Check the safety valves"

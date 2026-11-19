@@ -8,6 +8,10 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 {
     public class ThresholdRepository : IThresholdRepository
     {
+        private const string EquipmentThresholdUniqueIndexName = "UX_Thresholds_EquipmentId_MeasurementType";
+        private const string GlobalThresholdUniqueIndexName = "UX_Thresholds_Global_MeasurementType";
+        private const string ThresholdEquipmentForeignKeyName = "FK_Thresholds_Equipment_EquipmentId";
+
         private readonly EquipmentMonitoringDbContext _dbContext;
 
         public ThresholdRepository(EquipmentMonitoringDbContext dbContext)
@@ -70,16 +74,29 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
             {
                 return await _dbContext.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException exception) when (SqliteErrors.IsUniqueViolation(exception))
+            catch (DbUpdateException exception) when (IsThresholdUniqueViolation(exception))
             {
                 var threshold = FindFailedThreshold(exception);
                 throw new ThresholdConflictException(threshold?.EquipmentId, threshold?.MeasurementType ?? default, exception);
             }
-            catch (DbUpdateException exception) when (SqliteErrors.IsForeignKeyViolation(exception))
+            catch (DbUpdateException exception) when (IsThresholdEquipmentForeignKeyViolation(exception))
             {
                 var threshold = FindFailedThreshold(exception);
                 throw new EquipmentNotFoundException(threshold?.EquipmentId ?? Guid.Empty, exception);
             }
+        }
+
+        private static bool IsThresholdUniqueViolation(DbUpdateException exception)
+        {
+            return SqliteErrors.IsPostgresConstraint(exception, EquipmentThresholdUniqueIndexName)
+                || SqliteErrors.IsPostgresConstraint(exception, GlobalThresholdUniqueIndexName)
+                || SqliteErrors.IsUniqueViolation(exception);
+        }
+
+        private static bool IsThresholdEquipmentForeignKeyViolation(DbUpdateException exception)
+        {
+            return SqliteErrors.IsPostgresConstraint(exception, ThresholdEquipmentForeignKeyName)
+                || SqliteErrors.IsForeignKeyViolation(exception);
         }
 
         private Threshold? FindFailedThreshold(DbUpdateException exception)

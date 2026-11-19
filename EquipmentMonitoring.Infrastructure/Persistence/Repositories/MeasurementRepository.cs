@@ -2,14 +2,13 @@ using EquipmentMonitoring.Application.Abstractions.Persistence;
 using EquipmentMonitoring.Application.Exceptions;
 using EquipmentMonitoring.Domain.Entities;
 using EquipmentMonitoring.Domain.Enums;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 {
     public class MeasurementRepository : IMeasurementRepository
     {
-        private const int SqliteConstraintForeignKeyExtendedErrorCode = 787;
+        private const string MeasurementEquipmentForeignKeyName = "FK_Measurements_Equipment_EquipmentId";
 
         private readonly EquipmentMonitoringDbContext _dbContext;
 
@@ -83,19 +82,14 @@ namespace EquipmentMonitoring.Infrastructure.Persistence.Repositories
 
         private static bool IsMeasurementEquipmentForeignKeyViolation(DbUpdateException exception)
         {
-            if (exception.InnerException is not SqliteException sqliteException)
+            if (SqliteErrors.IsPostgresConstraint(exception, MeasurementEquipmentForeignKeyName))
             {
-                return false;
+                return true;
             }
 
-            if (sqliteException.SqliteExtendedErrorCode
-                != SqliteConstraintForeignKeyExtendedErrorCode)
-            {
-                return false;
-            }
-
-            return sqliteException.Message.Contains("FOREIGN KEY constraint failed", StringComparison.Ordinal)
-                || sqliteException.Message.Contains("FK_Measurements_Equipment_EquipmentId", StringComparison.Ordinal);
+            return SqliteErrors.IsForeignKeyViolation(exception)
+                && (exception.InnerException?.Message.Contains("FOREIGN KEY constraint failed", StringComparison.Ordinal) == true
+                || exception.InnerException?.Message.Contains("FK_Measurements_Equipment_EquipmentId", StringComparison.Ordinal) == true);
         }
     }
 }
