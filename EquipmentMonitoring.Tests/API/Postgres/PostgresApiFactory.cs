@@ -27,6 +27,11 @@ namespace EquipmentMonitoring.Tests.API.Postgres
             return new PostgresApiFactory(await server.CreateEmptyDatabaseAsync());
         }
 
+        public Task DropDatabaseAsync()
+        {
+            return _database.DisposeAsync().AsTask();
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Docker");
