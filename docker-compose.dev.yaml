@@ -1,0 +1,8 @@
+# Local development: PostgreSQL in Docker, API from the IDE (F5).
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d db
+# Credentials and port must match ConnectionStrings:EquipmentDatabase in appsettings.Development.json
+# (or override it with user-secrets / ConnectionStrings__EquipmentDatabase).
+services:
+  db:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
