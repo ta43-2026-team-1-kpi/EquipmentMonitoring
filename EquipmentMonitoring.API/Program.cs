@@ -12,11 +12,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("EquipmentDatabase")
-    ?? throw new InvalidOperationException(
-        "Connection string 'EquipmentDatabase' is not configured. " +
-        "For Docker Compose run, use .env and docker-compose.yaml. " +
-        "For local non-Docker run, set ConnectionStrings__EquipmentDatabase to a PostgreSQL connection string.");
+var connectionString = PostgresConnectionString.Resolve(builder.Configuration);
 
 builder.Services.AddDbContext<EquipmentMonitoringDbContext, PostgresEquipmentMonitoringDbContext>(options =>
     options.UseNpgsql(
