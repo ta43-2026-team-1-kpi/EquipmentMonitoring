@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  TRIVY_VERSION: 0.76.2
+
+jobs:
+  test:
+    name: Build and test (SQLite + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore EquipmentMonitoring.slnx
+
+      - name: Build
+        run: dotnet build EquipmentMonitoring.slnx --configuration Release --no-restore
+
+      # PostgreSQL tests start their own container through Testcontainers; the runner's Docker is enough.
+      - name: Test
+        run: >
+          dotnet test EquipmentMonitoring.slnx --configuration Release --no-build
+          --logger "trx;LogFileName=tests.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
+
+  image:
+    name: API image and vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build --tag equipment-monitoring-api:ci .
+
+      - name: Scan image (fixable HIGH/CRITICAL fail the build)
+        run: >
+          docker save equipment-monitoring-api:ci --output api.tar &&
+          docker run --rm --volume "$PWD:/work:ro" "aquasec/trivy:${TRIVY_VERSION}"
+          image --input /work/api.tar --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+
+  stack:
+    name: Production stack end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE_FILE: docker-compose.yaml:docker-compose.prod.yaml:docker-compose.monitoring.yaml
+      COMPOSE_PROFILES: demo
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare configuration and secrets
+        shell: pwsh
+        run: |
+          Copy-Item .env.example .env
+          ./scripts/new-secrets.ps1
+
+      - name: Verify stack (availability, function, security, monitoring, persistence, backup)
+        shell: pwsh
+        run: >
+          ./scripts/verify-stack.ps1
+          -ComposeFile docker-compose.yaml,docker-compose.prod.yaml,docker-compose.monitoring.yaml
+          -Profile demo
+
+      - name: Collect container logs
+        if: failure()
+        run: docker compose logs --no-color --timestamps > compose.log
+
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-logs
+          path: compose.log
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes

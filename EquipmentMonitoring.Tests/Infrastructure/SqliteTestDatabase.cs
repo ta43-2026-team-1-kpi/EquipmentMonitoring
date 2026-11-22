@@ -1,12 +1,10 @@
-using EquipmentMonitoring.Domain.Entities;
-using EquipmentMonitoring.Domain.Enums;
 using EquipmentMonitoring.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EquipmentMonitoring.Tests.Infrastructure
 {
-    internal sealed class SqliteTestDatabase : IAsyncDisposable
+    internal sealed class SqliteTestDatabase : TestDatabase
     {
         private readonly SqliteConnection _connection;
 
@@ -27,7 +25,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure
             return database;
         }
 
-        public EquipmentMonitoringDbContext CreateContext()
+        public override EquipmentMonitoringDbContext CreateContext()
         {
             var options = new DbContextOptionsBuilder<EquipmentMonitoringDbContext>()
                 .UseSqlite(_connection)
@@ -36,51 +34,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure
             return new EquipmentMonitoringDbContext(options);
         }
 
-        public async Task<Equipment> AddEquipmentAsync(string serialNumber, string name = "Compressor")
-        {
-            var equipment = new Equipment(name, "Compressor", serialNumber, "Workshop 1", EquipmentStatus.Working);
-
-            await using var context = CreateContext();
-            context.Equipment.Add(equipment);
-            await context.SaveChangesAsync();
-
-            return equipment;
-        }
-
-        public async Task<Measurement> AddMeasurementAsync(Guid equipmentId, MeasurementType type, double value, DateTime measuredAtUtc)
-        {
-            var measurement = new Measurement(equipmentId, type, value, type.GetUnit(), measuredAtUtc);
-
-            await using var context = CreateContext();
-            context.Measurements.Add(measurement);
-            await context.SaveChangesAsync();
-
-            return measurement;
-        }
-
-        public async Task<Warning> AddWarningAsync(
-            Guid equipmentId,
-            MeasurementType type,
-            DateTime createdAtUtc,
-            bool acknowledged = false)
-        {
-            var measurement = await AddMeasurementAsync(equipmentId, type, 60, createdAtUtc);
-            var threshold = Threshold.CreateGlobal(type, null, 50, createdAtUtc);
-            var warning = Warning.FromBreach(measurement, threshold, threshold.Evaluate(measurement.Value)!, createdAtUtc);
-
-            if (acknowledged)
-            {
-                warning.Acknowledge(createdAtUtc.AddMinutes(1));
-            }
-
-            await using var context = CreateContext();
-            context.Warnings.Add(warning);
-            await context.SaveChangesAsync();
-
-            return warning;
-        }
-
-        public ValueTask DisposeAsync()
+        public override ValueTask DisposeAsync()
         {
             return _connection.DisposeAsync();
         }

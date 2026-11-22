@@ -12,6 +12,17 @@ coverage/
 .env
 .env.*
 !.env.example
+secrets/
 **/equipment-monitoring.db
 **/equipment-monitoring.db-*
 README.assets/
+
+# Not needed to build the API image; keeps the build cache valid when they change.
+.github/
+docs/
+grafana/
+scripts/
+tools/
+EquipmentMonitoring.Tests/
+docker-compose*.yaml
+*.md

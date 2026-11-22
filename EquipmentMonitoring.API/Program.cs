@@ -6,16 +6,13 @@ using EquipmentMonitoring.Application.Services;
 using EquipmentMonitoring.Application.Validation;
 using EquipmentMonitoring.Infrastructure.Persistence;
 using EquipmentMonitoring.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("EquipmentDatabase")
-    ?? throw new InvalidOperationException(
-        "Connection string 'EquipmentDatabase' is not configured. " +
-        "For Docker Compose run, use .env and docker-compose.yaml. " +
-        "For local non-Docker run, set ConnectionStrings__EquipmentDatabase to a PostgreSQL connection string.");
+var connectionString = PostgresConnectionString.Resolve(builder.Configuration);
 
 builder.Services.AddDbContext<EquipmentMonitoringDbContext, PostgresEquipmentMonitoringDbContext>(options =>
     options.UseNpgsql(
@@ -40,6 +37,9 @@ builder.Services.AddScoped<IMeasurementRule, ThresholdBreachRule>();
 builder.Services.AddScoped<IMeasurementMonitor, MeasurementMonitor>();
 builder.Services.AddScoped<ThresholdService>();
 builder.Services.AddScoped<WarningService>();
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<EquipmentMonitoringDbContext>("database", tags: [ReadinessTag]);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -81,7 +81,12 @@ if (app.Configuration.GetValue("Http:UseHttpsRedirection", true))
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadinessTag) });
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    private const string ReadinessTag = "ready";
+}
