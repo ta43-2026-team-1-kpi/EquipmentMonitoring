@@ -1,0 +1,132 @@
+# Production overlay on top of docker-compose.yaml:
+#   ./scripts/new-secrets.ps1
+#   docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build --wait
+#
+# - passwords are Docker secrets (secrets/*.txt), never environment variables;
+# - PostgreSQL is reachable only from the internal "backend" network;
+# - every service has a healthcheck, resource limits, log rotation and no privilege escalation;
+# - pgAdmin starts with the database server already registered;
+# - optional .env settings: API_PORT, PGADMIN_PORT, SWAGGER_ENABLED.
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  db:
+    <<: *hardening
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ""
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    networks: !override
+      - backend
+    shm_size: 256m
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+
+  api:
+    <<: *hardening
+    environment:
+      # Kerberos is not used; disabling GSS encryption avoids probing for libgssapi, which the image does not ship.
+      ConnectionStrings__EquipmentDatabase: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Gss Encryption Mode=Disable
+      Database__PasswordFile: /run/secrets/postgres_password
+      # The Dockerfile binds through ASPNETCORE_URLS; clearing the base image default avoids the override warning.
+      ASPNETCORE_HTTP_PORTS: ""
+      Swagger__Enabled: ${SWAGGER_ENABLED:-true}
+    secrets:
+      - postgres_password
+    ports: !override
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    networks:
+      - monitoring_net
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    healthcheck:
+      # The runtime image has no curl/wget; bash /dev/tcp is enough for a plain HTTP probe.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+
+  pgadmin:
+    <<: *hardening
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?PGADMIN_DEFAULT_EMAIL must be set in .env}
+      PGADMIN_DEFAULT_PASSWORD: ""
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
+      PGADMIN_CONFIG_ENABLE_SERVER_PASS_EXEC_CMD: "True"
+      PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"
+    configs:
+      - source: pgadmin_servers
+        target: /pgadmin4/servers.json
+    secrets:
+      - pgadmin_password
+      - postgres_password
+    ports: !override
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    networks:
+      - monitoring_net
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/misc/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+
+networks:
+  backend:
+    internal: true
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  pgadmin_password:
+    file: ./secrets/pgadmin_password.txt
+
+configs:
+  pgadmin_servers:
+    content: |
+      {
+        "Servers": {
+          "1": {
+            "Name": "EquipmentMonitoring",
+            "Group": "Servers",
+            "Host": "db",
+            "Port": 5432,
+            "MaintenanceDB": "${POSTGRES_DB}",
+            "Username": "${POSTGRES_USER}",
+            "SSLMode": "prefer",
+            "PasswordExecCommand": "cat /run/secrets/postgres_password"
+          }
+        }
+      }
