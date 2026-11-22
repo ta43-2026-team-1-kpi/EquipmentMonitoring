@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Executed inside Linux containers: must keep LF on Windows checkouts.
+*.sh text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

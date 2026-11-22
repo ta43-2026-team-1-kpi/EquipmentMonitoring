@@ -6,7 +6,8 @@
 # - PostgreSQL is reachable only from the internal "backend" network;
 # - every service has a healthcheck, resource limits, log rotation and no privilege escalation;
 # - pgAdmin starts with the database server already registered;
-# - optional .env settings: API_PORT, PGADMIN_PORT, SWAGGER_ENABLED.
+# - "backup" takes scheduled pg_dump backups into the postgres_backups volume;
+# - optional .env settings: API_PORT, PGADMIN_PORT, SWAGGER_ENABLED, BACKUP_INTERVAL_SECONDS, BACKUP_RETENTION_DAYS.
 
 x-hardening: &hardening
   security_opt:
@@ -103,9 +104,48 @@ services:
           cpus: "0.5"
           memory: 512m
 
+  backup:
+    <<: *hardening
+    image: postgres:17.2
+    container_name: equipment-monitoring-backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/backup.sh"]
+    environment:
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    secrets:
+      - postgres_password
+    volumes:
+      - ./scripts/backup:/scripts:ro
+      - postgres_backups:/backups
+    networks:
+      - backend
+    healthcheck:
+      # Healthy only while backups actually succeed, not merely while the database is reachable.
+      test: ["CMD", "/bin/sh", "/scripts/backup.sh", "--healthy"]
+      interval: 60s
+      timeout: 5s
+      retries: 1
+      start_period: 120s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+
 networks:
   backend:
     internal: true
+
+volumes:
+  postgres_backups:
 
 secrets:
   postgres_password:

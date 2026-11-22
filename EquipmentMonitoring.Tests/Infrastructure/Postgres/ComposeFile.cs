@@ -8,6 +8,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure.Postgres
     internal static partial class ComposeFile
     {
         public const string Base = "docker-compose.yaml";
+        public const string Production = "docker-compose.prod.yaml";
 
         public static string PostgresImage { get; } = GetPostgresImages(Base).FirstOrDefault()
             ?? throw new InvalidOperationException($"PostgreSQL image is not declared in {Base}.");
