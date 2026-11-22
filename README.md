@@ -1,5 +1,7 @@
 # EquipmentMonitoring
 
+[![CI](https://github.com/ta43-2026-team-1-kpi/EquipmentMonitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/ta43-2026-team-1-kpi/EquipmentMonitoring/actions/workflows/ci.yml)
+
 ## Призначення
 
 **EquipmentMonitoring** — навчальний ASP.NET Core Web API-проєкт для моніторингу обладнання.
@@ -114,6 +116,18 @@ dotnet test
 
 Для запуску API поза Docker задайте PostgreSQL-рядок підключення через змінну середовища `ConnectionStrings__EquipmentDatabase`.
 
+Тести з категорією `PostgreSQL` запускають контейнер PostgreSQL через Testcontainers, тому потребують запущеного Docker. Без Docker:
+
+```powershell
+dotnet test --filter "Category!=PostgreSQL"
+```
+
+Запуск API з Visual Studio (F5): підніміть лише БД з відкритим портом і запускайте профіль `Development`, рядок підключення для нього задано в `appsettings.Development.json`.
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d db
+```
+
 ### 7) Керування сервісами
 
 ```powershell
@@ -144,6 +158,69 @@ docker compose down
 
 Другий і третій скрипт залежать від state-файла `%TEMP%\equipmentmonitoring-lab3-state.json`, який створює `lab3-functional-check.ps1`.
 
+### 10) Запуск з Docker secrets і бекапами
+
+1. Згенеруйте паролі (каталог `secrets/` не потрапляє в Git і Docker image):
+
+```powershell
+./scripts/new-secrets.ps1
+```
+
+2. Запустіть стек:
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --build --wait
+```
+
+У цьому режимі паролі передаються як Docker secrets, а не змінними середовища; `db` доступний тільки з внутрішньої мережі `backend`; усі сервіси мають healthcheck і ліміти ресурсів. `--wait` повертає керування, коли всі сервіси здорові.
+
+Важливо: пароль PostgreSQL застосовується лише під час першої ініціалізації volume. Якщо `postgres_data` уже створено з паролем із `.env`, запускайте з окремим іменем проєкту (`docker compose -p prod ...`) або видаліть volume (`docker compose down -v`, дані буде втрачено).
+
+### 11) pgAdmin і Grafana
+
+- pgAdmin: `http://localhost:<PGADMIN_PORT>`, вхід — `PGADMIN_DEFAULT_EMAIL` і пароль із `secrets/pgadmin_password.txt`. Сервер `EquipmentMonitoring` уже зареєстровано, налаштовувати підключення вручну не потрібно.
+- Grafana: `http://localhost:3000` (порт задає `GRAFANA_PORT`), вхід — `admin` і пароль із `secrets/grafana_admin_password.txt`. Дашборд «Моніторинг обладнання» відкривається після входу; БД читається під роллю з правом лише на читання.
+
+Grafana і симулятор датчиків (профіль `demo`, надсилає показники через API) підключаються окремим файлом:
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml -f docker-compose.monitoring.yaml --profile demo up -d --wait
+```
+
+### 12) Бекапи
+
+Сервіс `backup` раз на добу створює копію БД у volume `postgres_backups` і зберігає копії за останні 7 днів (`BACKUP_INTERVAL_SECONDS`, `BACKUP_RETENTION_DAYS` у `.env`).
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml exec backup /bin/sh /scripts/backup.sh --once
+```
+
+Відновлення останньої копії (API на цей час зупиняється):
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml stop api
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml exec backup /bin/sh /scripts/restore.sh
+docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --wait
+```
+
+Відновлення конкретної копії, перелік копій, діагностика: [docs/operations.md](docs/operations.md). Схема мереж і сервісів: [docs/deployment.md](docs/deployment.md). Обґрунтування рішень: [docs/adr](docs/adr).
+
+### 13) Автоматична перевірка стеку
+
+```powershell
+./scripts/verify-stack.ps1
+```
+
+Скрипт піднімає стек і перевіряє доступність сервісів, бізнес-сценарій, відсутність паролів у змінних середовища, ізоляцію БД, збереження даних після `restart` і `down`/`up`, відновлення з бекапу. Для перевірки разом із Grafana:
+
+```powershell
+./scripts/verify-stack.ps1 -ComposeFile docker-compose.yaml,docker-compose.prod.yaml,docker-compose.monitoring.yaml -Profile demo
+```
+
+Та сама перевірка виконується в CI для кожного PR.
+
+Важливо: скрипт перезапускає стек і використовує ті самі volume, що й п. 10, тому обмеження щодо пароля PostgreSQL з п. 10 діє і тут. Для ізольованого прогону з видаленням даних після завершення: `./scripts/verify-stack.ps1 -ProjectName verify -Down` (базовий стек перед цим зупиніть: `docker compose down`).
+
 ## Endpoint-и
 
 ### EPC-4 (обладнання)
@@ -173,6 +250,11 @@ docker compose down
 - `POST /api/maintenance-plans`
 - `GET /api/maintenance-plans`
 - `PATCH /api/maintenance-plans/{maintenancePlanId}/status`
+
+### Службові
+
+- `GET /health/live` — процес API працює
+- `GET /health/ready` — API готовий обробляти запити: перевіряє з'єднання з БД, повертає 503, якщо БД недоступна
 
 ## Типові проблеми
 
