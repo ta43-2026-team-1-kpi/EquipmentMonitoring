@@ -1,0 +1,119 @@
+# Monitoring overlay on top of the production stack:
+#   docker compose -f docker-compose.yaml -f docker-compose.prod.yaml -f docker-compose.monitoring.yaml up -d --wait
+# Adds a live demo data source:
+#   ... --profile demo up -d --wait
+#
+# - grafana: dashboards over PostgreSQL through the read-only "grafana_reader" role;
+# - grafana-db-init: one-shot, idempotent creation of that role after API migrations;
+# - simulator (profile "demo"): sensor gateway that posts measurements through the public API.
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  grafana-db-init:
+    <<: *hardening
+    image: postgres:17.2
+    container_name: equipment-monitoring-grafana-db-init
+    restart: "no"
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/create-grafana-reader.sh"]
+    environment:
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+    secrets:
+      - postgres_password
+      - grafana_db_password
+    volumes:
+      - ./scripts/db:/scripts:ro
+    networks:
+      - backend
+
+  grafana:
+    <<: *hardening
+    image: grafana/grafana:13.3.1
+    container_name: equipment-monitoring-grafana
+    restart: unless-stopped
+    depends_on:
+      grafana-db-init:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SECURITY_X_XSS_PROTECTION: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/equipment-monitoring.json
+    secrets:
+      - grafana_admin_password
+      - grafana_db_password
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - monitoring_net
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+
+  simulator:
+    <<: *hardening
+    image: python:3.13-alpine
+    container_name: equipment-monitoring-simulator
+    profiles: ["demo"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "-u", "/app/simulator.py"]
+    environment:
+      API_URL: http://api:8080
+      INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-5}
+      SPIKE_PROBABILITY: ${SIMULATOR_SPIKE_PROBABILITY:-0.03}
+    volumes:
+      - ./tools/sensor-simulator:/app:ro
+    networks:
+      - monitoring_net
+    read_only: true
+    cap_drop:
+      - ALL
+    user: "65534:65534"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128m
+
+volumes:
+  grafana_data:
+
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+  grafana_db_password:
+    file: ./secrets/grafana_db_password.txt

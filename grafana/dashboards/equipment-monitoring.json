@@ -1,0 +1,699 @@
+{
+  "uid": "equipment-monitoring",
+  "title": "Моніторинг обладнання",
+  "description": "Показники та попередження EquipmentMonitoring. Дані читаються з PostgreSQL під роллю grafana_reader (тільки читання).",
+  "tags": [
+    "equipment-monitoring",
+    "postgresql"
+  ],
+  "timezone": "browser",
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "schemaVersion": 41,
+  "version": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "equipment",
+        "label": "Обладнання",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "equipment-monitoring-db"
+        },
+        "query": "SELECT \"Name\" AS __text, \"Id\"::text AS __value FROM \"Equipment\" ORDER BY \"Name\"",
+        "definition": "SELECT \"Name\" AS __text, \"Id\"::text AS __value FROM \"Equipment\" ORDER BY \"Name\"",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "'__all'",
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 0
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Активні попередження",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS value FROM \"Warnings\" WHERE \"Status\" = 'Active' AND ('__all' IN ($equipment) OR \"EquipmentId\"::text IN ($equipment))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "description": "Попередження, які ще не опрацьовано оператором."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Обладнання в роботі",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FILTER (WHERE \"Status\" = 'Working') AS value FROM \"Equipment\" WHERE ('__all' IN ($equipment) OR \"Id\"::text IN ($equipment))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "description": "Кількість обладнання зі статусом Working."
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Несправне / на обслуговуванні",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FILTER (WHERE \"Status\" <> 'Working') AS value FROM \"Equipment\" WHERE ('__all' IN ($equipment) OR \"Id\"::text IN ($equipment))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "description": "Обладнання зі статусом Faulty або UnderMaintenance."
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Показників за період",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS value FROM \"Measurements\" WHERE $__timeFilter(\"MeasuredAtUtc\") AND ('__all' IN ($equipment) OR \"EquipmentId\"::text IN ($equipment))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "description": "Скільки вимірювань надійшло за вибраний проміжок часу."
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Температура",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(m.\"MeasuredAtUtc\", $__interval), e.\"Name\" AS metric, avg(m.\"Value\") AS value FROM \"Measurements\" m JOIN \"Equipment\" e ON e.\"Id\" = m.\"EquipmentId\" WHERE $__timeFilter(m.\"MeasuredAtUtc\") AND m.\"Type\" = 'Temperature' AND ('__all' IN ($equipment) OR m.\"EquipmentId\"::text IN ($equipment)) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Напруга",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(m.\"MeasuredAtUtc\", $__interval), e.\"Name\" AS metric, avg(m.\"Value\") AS value FROM \"Measurements\" m JOIN \"Equipment\" e ON e.\"Id\" = m.\"EquipmentId\" WHERE $__timeFilter(m.\"MeasuredAtUtc\") AND m.\"Type\" = 'Voltage' AND ('__all' IN ($equipment) OR m.\"EquipmentId\"::text IN ($equipment)) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "volt",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Навантаження",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(m.\"MeasuredAtUtc\", $__interval), e.\"Name\" AS metric, avg(m.\"Value\") AS value FROM \"Measurements\" m JOIN \"Equipment\" e ON e.\"Id\" = m.\"EquipmentId\" WHERE $__timeFilter(m.\"MeasuredAtUtc\") AND m.\"Type\" = 'Load' AND ('__all' IN ($equipment) OR m.\"EquipmentId\"::text IN ($equipment)) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Активні попередження за обладнанням",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT e.\"Name\" AS equipment, count(*) AS warnings FROM \"Warnings\" w JOIN \"Equipment\" e ON e.\"Id\" = w.\"EquipmentId\" WHERE w.\"Status\" = 'Active' AND ('__all' IN ($equipment) OR w.\"EquipmentId\"::text IN ($equipment)) GROUP BY e.\"Name\" ORDER BY warnings DESC, e.\"Name\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "legend": {
+          "showLegend": false
+        }
+      },
+      "description": "Те саме, що повертає GET /api/warnings/summary."
+    },
+    {
+      "id": 9,
+      "type": "piechart",
+      "title": "Попередження за типом показника",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 13,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \"MeasurementType\" AS metric, count(*) AS value FROM \"Warnings\" WHERE $__timeFilter(\"CreatedAtUtc\") AND ('__all' IN ($equipment) OR \"EquipmentId\"::text IN ($equipment)) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ],
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Нові попередження",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 13,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(\"CreatedAtUtc\", $__interval), \"MeasurementType\" AS metric, count(*) AS value FROM \"Warnings\" WHERE $__timeFilter(\"CreatedAtUtc\") AND ('__all' IN ($equipment) OR \"EquipmentId\"::text IN ($equipment)) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Останні попередження",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "equipment-monitoring-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "equipment-monitoring-db"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT w.\"CreatedAtUtc\" AS \"Час\", e.\"Name\" AS \"Обладнання\", e.\"SerialNumber\" AS \"Серійний номер\", w.\"MeasurementType\" AS \"Показник\", w.\"ActualValue\" AS \"Значення\", w.\"LimitValue\" AS \"Межа\", w.\"Unit\" AS \"Од.\", w.\"BreachType\" AS \"Порушення\", w.\"ThresholdScope\" AS \"Межа задана\", w.\"Status\" AS \"Статус\" FROM \"Warnings\" w JOIN \"Equipment\" e ON e.\"Id\" = w.\"EquipmentId\" WHERE $__timeFilter(w.\"CreatedAtUtc\") AND ('__all' IN ($equipment) OR w.\"EquipmentId\"::text IN ($equipment)) ORDER BY w.\"CreatedAtUtc\" DESC LIMIT 50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Статус"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Active": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "Acknowledged": {
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Час"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}

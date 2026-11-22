@@ -8,7 +8,9 @@
       3. security: no passwords in container environment, read-only non-root API,
          PostgreSQL unreachable outside the backend network, pgAdmin server pre-registered;
       4. persistence: data survives "restart" and "down" + "up" (volumes kept);
-      5. backup: a fresh backup restores data deleted after it was taken.
+      5. backup: a fresh backup restores data deleted after it was taken;
+      6. monitoring (when docker-compose.monitoring.yaml is included): Grafana, its datasource and dashboard,
+         read-only database role; with -Profile demo also that the simulator delivers measurements.
     Exits with code 1 if any check fails. Works in Windows PowerShell 5.1 and PowerShell 7.
 
     The stack is restarted and recreated during the run (volumes are kept unless -Down is given).
@@ -16,10 +18,13 @@
 .EXAMPLE
     ./scripts/verify-stack.ps1
 .EXAMPLE
+    ./scripts/verify-stack.ps1 -ComposeFile docker-compose.yaml,docker-compose.prod.yaml,docker-compose.monitoring.yaml -Profile demo
+.EXAMPLE
     ./scripts/verify-stack.ps1 -ProjectName verify -Down
 #>
 param(
     [string[]] $ComposeFile = @('docker-compose.yaml', 'docker-compose.prod.yaml'),
+    [Alias('Profile')] [string[]] $ComposeProfile = @(),
     [string] $ProjectName = '',
     [switch] $SkipBuild,
     [switch] $Down
@@ -34,6 +39,8 @@ Push-Location $repoRoot
 $composeArgs = @()
 if ($ProjectName) { $composeArgs += @('-p', $ProjectName) }
 foreach ($file in $ComposeFile) { $composeArgs += @('-f', $file) }
+foreach ($name in $ComposeProfile) { $composeArgs += @('--profile', $name) }
+$withMonitoring = [bool]($ComposeFile | Where-Object { $_ -like '*monitoring*' })
 
 $results = New-Object System.Collections.Generic.List[object]
 
@@ -137,7 +144,10 @@ try {
     $pgAdmin = "http://localhost:$pgAdminPort"
     $serial = 'SN-VERIFY-' + [DateTime]::UtcNow.ToString('yyyyMMddHHmmss')
 
+    $grafana = "http://localhost:$(if ($envMap.ContainsKey('GRAFANA_PORT')) { $envMap['GRAFANA_PORT'] } else { '3000' })"
+
     $requiredSecrets = @('postgres_password', 'pgadmin_password')
+    if ($withMonitoring) { $requiredSecrets += @('grafana_admin_password', 'grafana_db_password') }
     foreach ($secret in $requiredSecrets) {
         Assert-That (Test-Path -LiteralPath "secrets/$secret.txt") "secrets/$secret.txt is missing, run ./scripts/new-secrets.ps1"
     }
@@ -155,7 +165,7 @@ try {
     $postgresImage = $config.services.db.image
 
     Test-Check 'availability' 'all services healthy' {
-        # Services without a healthcheck only have to be running.
+        # Services without a healthcheck (simulator) only have to be running.
         $states = @(Invoke-Compose ps --format '{{.Service}}={{.State}}/{{.Health}}')
         $unhealthy = @($states | Where-Object { $_ -notmatch '=running/(healthy)?$' })
         Assert-That ($unhealthy.Count -eq 0) "not healthy: $($unhealthy -join ', ')"
@@ -236,6 +246,46 @@ try {
         $servers.Trim()
     }
 
+    if ($withMonitoring) {
+        $grafanaAuth = @{
+            Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("admin:$($secrets['grafana_admin_password'])"))
+        }
+
+        Test-Check 'monitoring' 'Grafana datasource connects to PostgreSQL' {
+            $response = Invoke-Http -Url "$grafana/api/datasources/uid/equipment-monitoring-db/health" -Headers $grafanaAuth
+            Assert-That ($response.Status -eq 200) "status $($response.Status)"
+            ($response.Content | ConvertFrom-Json).message
+        }
+        Test-Check 'monitoring' 'dashboard is provisioned' {
+            $response = Invoke-Http -Url "$grafana/api/dashboards/uid/equipment-monitoring" -Headers $grafanaAuth
+            Assert-That ($response.Status -eq 200) "status $($response.Status)"
+            $panels = @(($response.Content | ConvertFrom-Json).dashboard.panels)
+            Assert-That ($panels.Count -gt 0) 'dashboard has no panels'
+            "$($panels.Count) panels"
+        }
+        Test-Check 'monitoring' 'dashboard database role is read-only' {
+            $sql = 'DELETE FROM "Warnings";'
+            $attempt = Invoke-Native { $sql | docker compose @composeArgs exec -T -e "PGPASSWORD=$($secrets['grafana_db_password'])" db psql -v ON_ERROR_STOP=1 -h localhost -U grafana_reader -d $envMap['POSTGRES_DB'] }
+            Assert-That ($attempt.ExitCode -ne 0) 'grafana_reader was able to delete rows'
+            Assert-That ("$($attempt.Output)" -match 'read-only transaction') "unexpected error: $($attempt.Output)"
+            'write rejected'
+        }
+
+        if ($ComposeProfile -contains 'demo') {
+            Test-Check 'monitoring' 'simulator delivers measurements' {
+                $count = {
+                    $sql = 'SELECT count(*) FROM "Measurements" m JOIN "Equipment" e ON e."Id" = m."EquipmentId" WHERE e."SerialNumber" LIKE ''SIM-%'';'
+                    [int]("$(Invoke-ComposeInput $sql exec -T db sh -c 'exec psql -tA -U $POSTGRES_USER -d $POSTGRES_DB')".Trim())
+                }
+                $before = & $count
+                Start-Sleep -Seconds 15
+                $after = & $count
+                Assert-That ($after -gt $before) "no new measurements ($before -> $after)"
+                "$before -> $after"
+            }
+        }
+    }
+
     Test-Check 'persistence' 'data survives restart' {
         Invoke-Compose restart | Out-Null
         Wait-Stack
@@ -262,6 +312,14 @@ try {
         $warnings = (Invoke-Http -Url "$api/api/warnings?equipmentId=$script:equipmentId").Content | ConvertFrom-Json
         Assert-That ($warnings.totalCount -eq 1) 'warning not restored'
         ($backup | Select-Object -Last 1)
+    }
+    if ($withMonitoring) {
+        Test-Check 'monitoring' 'dashboard role keeps access after restore' {
+            $sql = 'SELECT count(*) FROM "Equipment";'
+            $read = Invoke-Native { $sql | docker compose @composeArgs exec -T -e "PGPASSWORD=$($secrets['grafana_db_password'])" db psql -tA -v ON_ERROR_STOP=1 -h localhost -U grafana_reader -d $envMap['POSTGRES_DB'] }
+            Assert-That ($read.ExitCode -eq 0) "read failed: $($read.Output)"
+            "equipment rows: $("$($read.Output)".Trim())"
+        }
     }
 }
 catch {

@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: EquipmentMonitoring
+    uid: equipment-monitoring-db
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: db:5432
+    user: grafana_reader
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1700
+      timescaledb: false
+      maxOpenConns: 5
+    secureJsonData:
+      password: $__file{/run/secrets/grafana_db_password}

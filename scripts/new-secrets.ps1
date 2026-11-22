@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Generates random passwords for docker-compose.prod.yaml into secrets/.
+    Generates random passwords for docker-compose.prod.yaml and docker-compose.monitoring.yaml into secrets/.
 .DESCRIPTION
     Existing files are kept unless -Force is given: changing the PostgreSQL password does not
     change it inside an already initialized postgres_data volume.
@@ -41,7 +41,7 @@ function New-Password([int] $length) {
     return $password.ToString()
 }
 
-foreach ($name in 'postgres_password', 'pgadmin_password') {
+foreach ($name in 'postgres_password', 'pgadmin_password', 'grafana_admin_password', 'grafana_db_password') {
     $path = Join-Path $secretsDir "$name.txt"
     if ((Test-Path -LiteralPath $path) -and -not $Force) {
         Write-Output "kept     $path"

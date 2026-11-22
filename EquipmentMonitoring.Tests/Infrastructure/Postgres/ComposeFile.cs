@@ -9,6 +9,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure.Postgres
     {
         public const string Base = "docker-compose.yaml";
         public const string Production = "docker-compose.prod.yaml";
+        public const string Monitoring = "docker-compose.monitoring.yaml";
 
         public static string PostgresImage { get; } = GetPostgresImages(Base).FirstOrDefault()
             ?? throw new InvalidOperationException($"PostgreSQL image is not declared in {Base}.");

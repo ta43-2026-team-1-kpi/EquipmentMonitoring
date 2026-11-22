@@ -4,6 +4,7 @@ namespace EquipmentMonitoring.Tests.Infrastructure.Postgres
     {
         [Theory]
         [InlineData(ComposeFile.Production)]
+        [InlineData(ComposeFile.Monitoring)]
         public void Overlay_ShouldUseSamePostgresImageAsDatabase(string fileName)
         {
             // pg_dump refuses to dump a newer server, and psql tooling should match the server it manages.

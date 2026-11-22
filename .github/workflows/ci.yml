@@ -71,7 +71,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      COMPOSE_FILE: docker-compose.yaml:docker-compose.prod.yaml
+      COMPOSE_FILE: docker-compose.yaml:docker-compose.prod.yaml:docker-compose.monitoring.yaml
+      COMPOSE_PROFILES: demo
     steps:
       - uses: actions/checkout@v7
 
@@ -81,9 +82,12 @@ jobs:
           Copy-Item .env.example .env
           ./scripts/new-secrets.ps1
 
-      - name: Verify stack (availability, function, security, persistence, backup)
+      - name: Verify stack (availability, function, security, monitoring, persistence, backup)
         shell: pwsh
-        run: ./scripts/verify-stack.ps1
+        run: >
+          ./scripts/verify-stack.ps1
+          -ComposeFile docker-compose.yaml,docker-compose.prod.yaml,docker-compose.monitoring.yaml
+          -Profile demo
 
       - name: Collect container logs
         if: failure()
